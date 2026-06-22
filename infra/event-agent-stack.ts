@@ -149,6 +149,7 @@ export class EventAgentStack extends Stack {
         containerPort: 5180,
         environment: {
           EVENT_AGENT_PORT: "5180",
+          EVENT_AGENT_HOST: "0.0.0.0",
           EVENT_AGENT_AWS_REGION: Stack.of(this).region,
           EVENT_AGENT_DEFAULT_QUEUE_URL: defaultQueue.queueUrl,
           ...databaseEnvironment

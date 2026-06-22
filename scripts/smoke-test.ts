@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { buildApp } from "../src/server/app.js";
 
 test("api smoke flow", async () => {
-  const app = await buildApp({ config: { authToken: "test-token", port: 0 } });
+  const app = await buildApp({ config: { authToken: "test-token", host: "127.0.0.1", port: 0 } });
   await app.ready();
 
   const health = await app.inject({ method: "GET", url: "/api/health" });
@@ -49,4 +49,3 @@ test("api smoke flow", async () => {
 
   await app.close();
 });
-

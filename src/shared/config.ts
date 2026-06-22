@@ -1,6 +1,7 @@
 export interface AppConfig {
   authToken: string;
   port: number;
+  host: string;
   awsRegion?: string | undefined;
   databaseUrl?: string | undefined;
   databaseHost?: string | undefined;
@@ -16,6 +17,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return {
     authToken: env.EVENT_AGENT_AUTH_TOKEN ?? "dev-token",
     port: Number.parseInt(env.EVENT_AGENT_PORT ?? "5180", 10),
+    host: env.EVENT_AGENT_HOST ?? "127.0.0.1",
     awsRegion: env.EVENT_AGENT_AWS_REGION,
     databaseUrl: env.EVENT_AGENT_DATABASE_URL,
     databaseHost: env.EVENT_AGENT_DATABASE_HOST,
