@@ -81,7 +81,7 @@ export class EventAgentStack extends Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       securityGroups: [dbSecurityGroup],
       engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_16_3
+        version: rds.PostgresEngineVersion.VER_16_13
       }),
       credentials: rds.Credentials.fromSecret(dbCredentials),
       databaseName: "event_agent",
