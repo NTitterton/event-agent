@@ -158,8 +158,8 @@ Initial repo layout:
 - `src/server`: API/control-plane app.
 - `src/worker`: queue worker entrypoint and execution loop.
 - `src/ui`: minimal browser UI shell.
-- `src/infra`: cloud architecture notes and future IaC entrypoint.
+- `src/infra`: cloud architecture notes.
+- `infra`: AWS CDK app that synthesizes CloudFormation for the initial cloud runtime.
 - `scripts`: smoke and helper scripts.
 
-The first code checkpoint intentionally uses in-memory adapters for verification. The next implementation milestone should replace the persistence and queue interfaces with RDS/SQS adapters while keeping the API and worker contracts stable.
-
+The first code checkpoint intentionally uses in-memory adapters for verification. The CDK checkpoint provisions the intended AWS shape, but the next implementation milestone should replace the persistence and queue interfaces with RDS/SQS adapters while keeping the API and worker contracts stable.

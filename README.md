@@ -62,8 +62,22 @@ Core environment variables:
 - `EVENT_AGENT_PORT`: API port, default `5180`.
 - `EVENT_AGENT_AWS_REGION`: AWS region for hosted adapters.
 - `EVENT_AGENT_DATABASE_URL`: RDS PostgreSQL connection string.
+- `EVENT_AGENT_DATABASE_HOST`, `EVENT_AGENT_DATABASE_PORT`, `EVENT_AGENT_DATABASE_NAME`, `EVENT_AGENT_DATABASE_USER`, `EVENT_AGENT_DATABASE_PASSWORD`: split RDS connection settings used by ECS secrets.
 - `EVENT_AGENT_DEFAULT_QUEUE_URL`: default SQS queue URL.
 - `EVENT_AGENT_EVENT_BUS_NAME`: optional EventBridge bus name for future fanout.
+
+## Infrastructure
+
+The repo uses AWS CDK as a typed wrapper around CloudFormation:
+
+```sh
+npx cdk bootstrap
+npm run infra:synth
+npm run infra:diff
+npm run infra:deploy
+```
+
+The initial stack defines VPC networking, RDS PostgreSQL, SQS default/DLQ queues, ECS/Fargate API and worker services, generated API/database secrets, CloudWatch logs, and an EventBridge Scheduler group/role. Deploying it creates billable AWS resources. `npx cdk bootstrap` is required once per AWS account/region before the first asset-based deployment.
 
 Cloud integration tests will require explicit opt-in variables before they touch AWS resources.
 
@@ -86,4 +100,3 @@ The intended remote is:
 ```sh
 https://github.com/NTitterton/event-agent
 ```
-

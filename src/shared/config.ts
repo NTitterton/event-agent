@@ -3,6 +3,11 @@ export interface AppConfig {
   port: number;
   awsRegion?: string | undefined;
   databaseUrl?: string | undefined;
+  databaseHost?: string | undefined;
+  databasePort?: number | undefined;
+  databaseName?: string | undefined;
+  databaseUser?: string | undefined;
+  databasePassword?: string | undefined;
   defaultQueueUrl?: string | undefined;
   eventBusName?: string | undefined;
 }
@@ -13,6 +18,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     port: Number.parseInt(env.EVENT_AGENT_PORT ?? "5180", 10),
     awsRegion: env.EVENT_AGENT_AWS_REGION,
     databaseUrl: env.EVENT_AGENT_DATABASE_URL,
+    databaseHost: env.EVENT_AGENT_DATABASE_HOST,
+    databasePort: env.EVENT_AGENT_DATABASE_PORT ? Number.parseInt(env.EVENT_AGENT_DATABASE_PORT, 10) : undefined,
+    databaseName: env.EVENT_AGENT_DATABASE_NAME,
+    databaseUser: env.EVENT_AGENT_DATABASE_USER,
+    databasePassword: env.EVENT_AGENT_DATABASE_PASSWORD,
     defaultQueueUrl: env.EVENT_AGENT_DEFAULT_QUEUE_URL,
     eventBusName: env.EVENT_AGENT_EVENT_BUS_NAME
   };

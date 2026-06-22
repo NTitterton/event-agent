@@ -1,0 +1,8 @@
+{
+  "app": "tsx infra/app.ts",
+  "context": {
+    "projectName": "event-agent",
+    "environmentName": "dev"
+  }
+}
+
