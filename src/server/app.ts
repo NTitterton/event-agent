@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { loadConfig, runtimeMode, type AppConfig } from "../shared/config.js";
 import type { AgentTriggerMessage, JobMessage } from "../shared/types.js";
+import { LocalArtifactUrlSigner, S3ArtifactUrlSigner, type ArtifactUrlSigner } from "./artifacts.js";
 import { MemoryQueuePublisher, type QueuePublisher } from "./queue.js";
 import { MemoryStore, type Store } from "./store.js";
 
@@ -31,12 +32,14 @@ export interface AppDependencies {
   config?: AppConfig;
   store?: Store;
   queue?: QueuePublisher;
+  artifactUrlSigner?: ArtifactUrlSigner;
 }
 
 export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInstance> {
   const config = deps.config ?? loadConfig();
   const store = deps.store ?? new MemoryStore();
   const queue = deps.queue ?? new MemoryQueuePublisher();
+  const artifactUrlSigner = deps.artifactUrlSigner ?? (config.reportsBucket ? new S3ArtifactUrlSigner(config) : new LocalArtifactUrlSigner());
   const app = Fastify({ logger: false });
   const uiDistPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../dist/ui");
 
@@ -137,6 +140,12 @@ export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInsta
     const run = await store.getRun(request.params.id);
     if (!run) return reply.code(404).send({ error: "Run not found" });
     return { artifacts: await store.listRunArtifacts(run.id) };
+  });
+
+  app.get<{ Params: { id: string } }>("/api/artifacts/:id/access-url", async (request, reply) => {
+    const artifact = await store.getArtifact(request.params.id);
+    if (!artifact) return reply.code(404).send({ error: "Artifact not found" });
+    return { artifact, access: await artifactUrlSigner.sign(artifact) };
   });
 
   app.post<{ Params: { id: string } }>("/api/runs/:id/cancel", async (request, reply) => {

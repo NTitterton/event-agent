@@ -37,6 +37,7 @@ export interface Store {
   getAgent(id: string): Promise<AgentDefinition | undefined>;
   upsertAgent(input: AgentDefinition): Promise<AgentDefinition>;
   createArtifact(input: Omit<RunArtifact, "id" | "createdAt">): Promise<RunArtifact>;
+  getArtifact(id: string): Promise<RunArtifact | undefined>;
   listRunArtifacts(runId: string): Promise<RunArtifact[]>;
 }
 
@@ -212,6 +213,10 @@ export class MemoryStore implements Store {
       this.runs.set(run.id, { ...run, artifactCount: current.length, updatedAt: now() });
     }
     return artifact;
+  }
+
+  async getArtifact(idValue: string): Promise<RunArtifact | undefined> {
+    return [...this.artifacts.values()].flat().find((artifact) => artifact.id === idValue);
   }
 
   async listRunArtifacts(runId: string): Promise<RunArtifact[]> {

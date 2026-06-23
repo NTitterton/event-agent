@@ -231,6 +231,7 @@ export class EventAgentStack extends Stack {
 
     defaultQueue.grantConsumeMessages(workerTask.taskRole);
     defaultQueue.grantSendMessages(apiService.taskDefinition.taskRole);
+    reportsBucket.grantRead(apiService.taskDefinition.taskRole);
     reportsBucket.grantWrite(workerTask.taskRole);
     database.secret?.grantRead(apiService.taskDefinition.taskRole);
     database.secret?.grantRead(workerTask.taskRole);

@@ -75,5 +75,12 @@ test("api smoke flow", async () => {
   assert.equal(runsResponse.statusCode, 200);
   assert.equal(runsResponse.json().runs.length, 1);
 
+  const missingArtifactResponse = await app.inject({
+    method: "GET",
+    url: "/api/artifacts/art_missing/access-url",
+    headers: auth
+  });
+  assert.equal(missingArtifactResponse.statusCode, 404);
+
   await app.close();
 });

@@ -148,6 +148,12 @@ article {
   overflow-wrap: anywhere;
 }
 
+.artifact-row {
+  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 h3 {
   font-size: 14px;
   margin: 18px 0 10px;
@@ -234,7 +240,8 @@ h3 {
   }
 
   .detail-grid,
-  .log-row {
+  .log-row,
+  .artifact-row {
     grid-template-columns: 1fr;
   }
 }

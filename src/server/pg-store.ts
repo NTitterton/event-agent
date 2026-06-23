@@ -390,6 +390,12 @@ export class PgStore implements Store {
     return artifact;
   }
 
+  async getArtifact(idValue: string): Promise<RunArtifact | undefined> {
+    await this.init();
+    const result = await this.pool.query("select * from run_artifacts where id = $1", [idValue]);
+    return result.rowCount ? artifactFromRow(result.rows[0]) : undefined;
+  }
+
   async listRunArtifacts(runId: string): Promise<RunArtifact[]> {
     await this.init();
     const result = await this.pool.query("select * from run_artifacts where run_id = $1 order by created_at asc", [runId]);

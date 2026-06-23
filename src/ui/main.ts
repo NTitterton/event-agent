@@ -25,6 +25,7 @@ interface RunLog {
 }
 
 interface RunArtifact {
+  id: string;
   title: string;
   bucket: string;
   key: string;
@@ -153,6 +154,11 @@ async function loadRunDetail(): Promise<void> {
     <h3>Logs</h3>
     <div class="log-list">${renderLogs(json.logs)}</div>
   `;
+  runDetailEl.querySelectorAll<HTMLButtonElement>("[data-artifact-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      void openArtifact(button.dataset.artifactId);
+    });
+  });
 }
 
 function detailItem(label: string, value: string): string {
@@ -164,9 +170,21 @@ function renderArtifacts(artifacts: RunArtifact[]): string {
   return artifacts
     .map(
       (artifact) =>
-        `<div class="row"><strong>${escapeHtml(artifact.title)}</strong><span>${escapeHtml(artifact.ticker ?? "artifact")} · ${escapeHtml(artifact.contentType)}</span><code>s3://${escapeHtml(artifact.bucket)}/${escapeHtml(artifact.key)}</code></div>`
+        `<div class="row artifact-row"><div><strong>${escapeHtml(artifact.title)}</strong><span>${escapeHtml(artifact.ticker ?? "artifact")} · ${escapeHtml(artifact.contentType)}</span><code>s3://${escapeHtml(artifact.bucket)}/${escapeHtml(artifact.key)}</code></div><button class="secondary" type="button" data-artifact-id="${escapeHtml(artifact.id)}">Open</button></div>`
     )
     .join("");
+}
+
+async function openArtifact(artifactId: string | undefined): Promise<void> {
+  if (!artifactId) return;
+  const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "";
+  if (!token) return;
+  const response = await fetch(`/api/artifacts/${encodeURIComponent(artifactId)}/access-url`, {
+    headers: { authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) return;
+  const json = (await response.json()) as { access: { url: string } };
+  window.open(json.access.url, "_blank", "noopener,noreferrer");
 }
 
 function renderLogs(logs: RunLog[]): string {
