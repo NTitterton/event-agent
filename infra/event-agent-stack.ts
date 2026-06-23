@@ -9,6 +9,7 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import * as rds from "aws-cdk-lib/aws-rds";
 import * as scheduler from "aws-cdk-lib/aws-scheduler";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 
@@ -44,6 +45,11 @@ export class EventAgentStack extends Stack {
         excludePunctuation: true,
         passwordLength: 48
       }
+    });
+
+    const openAiApiKey = new secretsmanager.Secret(this, "OpenAiApiKey", {
+      secretName: `${name}/openai-api-key`,
+      secretStringValue: cdk.SecretValue.unsafePlainText("replace-me")
     });
 
     const dbCredentials = new secretsmanager.Secret(this, "DatabaseCredentials", {
@@ -109,6 +115,15 @@ export class EventAgentStack extends Stack {
       }
     });
 
+    const reportsBucket = new s3.Bucket(this, "ReportsBucket", {
+      bucketName: `${name}-reports-${this.account}`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      versioned: true,
+      removalPolicy: RemovalPolicy.RETAIN
+    });
+
     const cluster = new ecs.Cluster(this, "Cluster", {
       vpc,
       clusterName: name,
@@ -153,11 +168,13 @@ export class EventAgentStack extends Stack {
           EVENT_AGENT_HOST: "0.0.0.0",
           EVENT_AGENT_AWS_REGION: Stack.of(this).region,
           EVENT_AGENT_DEFAULT_QUEUE_URL: defaultQueue.queueUrl,
+          EVENT_AGENT_REPORTS_BUCKET: reportsBucket.bucketName,
           ...databaseEnvironment
         },
         secrets: {
           EVENT_AGENT_AUTH_TOKEN: ecs.Secret.fromSecretsManager(authToken),
-          EVENT_AGENT_DATABASE_PASSWORD: ecs.Secret.fromSecretsManager(dbCredentials, "password")
+          EVENT_AGENT_DATABASE_PASSWORD: ecs.Secret.fromSecretsManager(dbCredentials, "password"),
+          OPENAI_API_KEY: ecs.Secret.fromSecretsManager(openAiApiKey)
         },
         logDriver: ecs.LogDrivers.awsLogs({
           streamPrefix: "api",
@@ -186,11 +203,13 @@ export class EventAgentStack extends Stack {
       environment: {
         EVENT_AGENT_AWS_REGION: Stack.of(this).region,
         EVENT_AGENT_DEFAULT_QUEUE_URL: defaultQueue.queueUrl,
+        EVENT_AGENT_REPORTS_BUCKET: reportsBucket.bucketName,
         ...databaseEnvironment
       },
       secrets: {
         EVENT_AGENT_AUTH_TOKEN: ecs.Secret.fromSecretsManager(authToken),
-        EVENT_AGENT_DATABASE_PASSWORD: ecs.Secret.fromSecretsManager(dbCredentials, "password")
+        EVENT_AGENT_DATABASE_PASSWORD: ecs.Secret.fromSecretsManager(dbCredentials, "password"),
+        OPENAI_API_KEY: ecs.Secret.fromSecretsManager(openAiApiKey)
       },
       logging: ecs.LogDrivers.awsLogs({
         streamPrefix: "worker",
@@ -212,19 +231,43 @@ export class EventAgentStack extends Stack {
 
     defaultQueue.grantConsumeMessages(workerTask.taskRole);
     defaultQueue.grantSendMessages(apiService.taskDefinition.taskRole);
+    reportsBucket.grantWrite(workerTask.taskRole);
     database.secret?.grantRead(apiService.taskDefinition.taskRole);
     database.secret?.grantRead(workerTask.taskRole);
     authToken.grantRead(apiService.taskDefinition.taskRole);
     authToken.grantRead(workerTask.taskRole);
+    openAiApiKey.grantRead(apiService.taskDefinition.taskRole);
+    openAiApiKey.grantRead(workerTask.taskRole);
 
     const schedulerRole = new iam.Role(this, "SchedulerRole", {
       assumedBy: new iam.ServicePrincipal("scheduler.amazonaws.com")
     });
     defaultQueue.grantSendMessages(schedulerRole);
 
-    new scheduler.CfnScheduleGroup(this, "ScheduleGroup", {
+    const scheduleGroup = new scheduler.CfnScheduleGroup(this, "ScheduleGroup", {
       name
     });
+
+    const dailyStockReportSchedule = new scheduler.CfnSchedule(this, "DailyStockReportSchedule", {
+      name: "daily-stock-report",
+      groupName: name,
+      scheduleExpression: "cron(0 9 * * ? *)",
+      scheduleExpressionTimezone: "America/Los_Angeles",
+      flexibleTimeWindow: { mode: "OFF" },
+      target: {
+        arn: defaultQueue.queueArn,
+        roleArn: schedulerRole.roleArn,
+        input: JSON.stringify({
+          kind: "agent.trigger",
+          scheduleId: "sch_stock_report_daily",
+          agentId: "agent_stock_report_daily",
+          firedAt: "<aws.scheduler.scheduled-time>",
+          dedupeKey: "sch_stock_report_daily:<aws.scheduler.scheduled-time>:agent_stock_report_daily"
+        })
+      },
+      state: "ENABLED"
+    });
+    dailyStockReportSchedule.node.addDependency(scheduleGroup);
 
     new cdk.CfnOutput(this, "ApiUrl", {
       value: `http://${apiService.loadBalancer.loadBalancerDnsName}`
@@ -234,6 +277,9 @@ export class EventAgentStack extends Stack {
     });
     new cdk.CfnOutput(this, "DeadLetterQueueUrl", {
       value: deadLetterQueue.queueUrl
+    });
+    new cdk.CfnOutput(this, "ReportsBucketName", {
+      value: reportsBucket.bucketName
     });
     new cdk.CfnOutput(this, "DatabaseEndpoint", {
       value: database.dbInstanceEndpointAddress

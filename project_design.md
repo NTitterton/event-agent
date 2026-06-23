@@ -22,15 +22,16 @@ graph TD
     end
 
     subgraph "Cloud State And Messaging"
-        DB[("RDS PostgreSQL<br/>events, schedules, runs, logs")]
+        DB[("RDS PostgreSQL<br/>agents, events, schedules, runs, logs")]
         SQS["SQS Work Queues<br/>default/capability-specific"]
         DLQ["Dead-Letter Queues"]
+        S3["S3 Report Artifacts"]
         Secrets["Secrets Manager / SSM"]
     end
 
     subgraph "Worker Pool"
         Fargate["ECS/Fargate Worker Service"]
-        Executor["Constrained Job Executor"]
+    Executor["Prompt Agent Executor"]
         Logs["Run Log Stream"]
     end
 
@@ -50,6 +51,7 @@ graph TD
     Fargate --> Executor
     Executor --> Logs
     Executor --> DB
+    Executor --> S3
     Fargate --> Secrets
 ```
 
@@ -61,6 +63,7 @@ The system has four main subsystems:
 - **Trigger adapters:** EventBridge Scheduler for cron/rate events, API events for external triggers, internal events from workers/control-plane logic, and future webhook adapters.
 - **Persistence and messaging:** RDS PostgreSQL for queryable state and SQS for durable executable work.
 - **Workers:** stateless ECS/Fargate services that consume queues, lease runs, execute jobs, emit logs, and update status.
+- **Agents:** data-driven prompt definitions stored in Postgres. A prompt agent contains prompt text, input resolver config, model provider/model, and output settings. Adding an agent should not require adding an agent-specific TypeScript file.
 
 The first implementation keeps the adapter interfaces small so local smoke tests can run with in-memory adapters while hosted runtime uses AWS-backed adapters.
 
@@ -81,7 +84,9 @@ sequenceDiagram
     Worker->>Queue: receive message
     Worker->>DB: lease run
     Worker->>DB: mark running + append logs
-    Worker->>Worker: execute agent job
+    Worker->>Worker: resolve inputs + render prompt
+    Worker->>Worker: call model provider
+    Worker->>DB: create artifact metadata
     alt success
         Worker->>DB: mark succeeded
         Worker->>Queue: delete message
@@ -114,6 +119,7 @@ Workers consume messages with this conceptual shape:
 
 ```json
 {
+  "kind": "run",
   "runId": "run_...",
   "eventId": "evt_...",
   "queue": "default",
@@ -121,9 +127,22 @@ Workers consume messages with this conceptual shape:
 }
 ```
 
+Scheduled prompt agents may also arrive as:
+
+```json
+{
+  "kind": "agent.trigger",
+  "scheduleId": "sch_stock_report_daily",
+  "agentId": "agent_stock_report_daily",
+  "firedAt": "2026-06-23T16:00:00.000Z",
+  "dedupeKey": "sch_stock_report_daily:2026-06-23:agent_stock_report_daily"
+}
+```
+
 Workers must:
 
 - Validate the run exists before execution.
+- Load prompt-agent definitions from the store instead of importing agent-specific code.
 - Acquire or renew a run lease.
 - Handle duplicate delivery safely.
 - Append structured logs.
@@ -157,9 +176,10 @@ Initial repo layout:
 - `src/shared`: types, config, small utility contracts.
 - `src/server`: API/control-plane app.
 - `src/worker`: queue worker entrypoint and execution loop.
+- `src/agents`: reusable prompt execution primitives, provider adapters, artifact writers, and shared input resolvers.
 - `src/ui`: minimal browser UI shell.
 - `src/infra`: cloud architecture notes.
 - `infra`: AWS CDK app that synthesizes CloudFormation for the initial cloud runtime.
 - `scripts`: smoke and helper scripts.
 
-The first code checkpoint intentionally uses in-memory adapters for verification. The CDK checkpoint provisions the intended AWS shape, but the next implementation milestone should replace the persistence and queue interfaces with RDS/SQS adapters while keeping the API and worker contracts stable.
+The first hosted prompt-agent checkpoint uses Postgres for state, SQS for work, S3 for markdown report artifacts, and a direct model-provider adapter. The seeded daily stock agent is data in the store; TypeScript remains generic platform code.

@@ -1,4 +1,5 @@
 import { loadConfig, runtimeMode } from "../shared/config.js";
+import { startWorkerRuntime } from "./runtime.js";
 
 const config = loadConfig();
 const workerId = `worker_${crypto.randomUUID()}`;
@@ -20,6 +21,10 @@ console.log(
 );
 
 console.log("Worker queue consumption is scaffolded. The worker stays alive so ECS can supervise it.");
+
+if (runtimeMode(config) === "cloud") {
+  await startWorkerRuntime(config, workerId);
+}
 
 setInterval(() => {
   console.log(

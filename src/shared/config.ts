@@ -10,6 +10,12 @@ export interface AppConfig {
   databaseUser?: string | undefined;
   databasePassword?: string | undefined;
   defaultQueueUrl?: string | undefined;
+  reportsBucket?: string | undefined;
+  openaiApiKey?: string | undefined;
+  stockAgentId: string;
+  stockAgentScheduleId: string;
+  stockAgentScheduleExpression: string;
+  stockAgentScheduleTimezone: string;
   eventBusName?: string | undefined;
 }
 
@@ -26,10 +32,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     databaseUser: env.EVENT_AGENT_DATABASE_USER,
     databasePassword: env.EVENT_AGENT_DATABASE_PASSWORD,
     defaultQueueUrl: env.EVENT_AGENT_DEFAULT_QUEUE_URL,
+    reportsBucket: env.EVENT_AGENT_REPORTS_BUCKET,
+    openaiApiKey: env.OPENAI_API_KEY,
+    stockAgentId: env.EVENT_AGENT_STOCK_AGENT_ID ?? "agent_stock_report_daily",
+    stockAgentScheduleId: env.EVENT_AGENT_STOCK_AGENT_SCHEDULE_ID ?? "sch_stock_report_daily",
+    stockAgentScheduleExpression: env.EVENT_AGENT_STOCK_AGENT_SCHEDULE_EXPRESSION ?? "cron(0 9 * * ? *)",
+    stockAgentScheduleTimezone: env.EVENT_AGENT_STOCK_AGENT_SCHEDULE_TIMEZONE ?? "America/Los_Angeles",
     eventBusName: env.EVENT_AGENT_EVENT_BUS_NAME
   };
 }
 
 export function runtimeMode(config: AppConfig): "memory" | "cloud" {
-  return config.databaseUrl && config.defaultQueueUrl ? "cloud" : "memory";
+  const hasDatabaseUrl = Boolean(config.databaseUrl);
+  const hasSplitDatabase =
+    Boolean(config.databaseHost) &&
+    Boolean(config.databaseName) &&
+    Boolean(config.databaseUser) &&
+    Boolean(config.databasePassword);
+  return (hasDatabaseUrl || hasSplitDatabase) && config.defaultQueueUrl ? "cloud" : "memory";
 }

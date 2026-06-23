@@ -1,6 +1,7 @@
-import type { EventEnvelope, Run, RunLog, Schedule } from "../shared/types.js";
+import type { AgentDefinition, EventEnvelope, Run, RunArtifact, RunLog, Schedule } from "../shared/types.js";
 
 export interface CreateScheduleInput {
+  id?: string | undefined;
   name: string;
   expression: string;
   timezone?: string;
@@ -21,15 +22,22 @@ export interface UpdateScheduleInput {
 export interface Store {
   listSchedules(): Promise<Schedule[]>;
   createSchedule(input: CreateScheduleInput): Promise<Schedule>;
+  upsertSchedule(input: CreateScheduleInput): Promise<Schedule>;
   updateSchedule(id: string, input: UpdateScheduleInput): Promise<Schedule | undefined>;
   deleteSchedule(id: string): Promise<boolean>;
   createEvent(input: Omit<EventEnvelope, "id" | "createdAt">): Promise<EventEnvelope>;
-  createRun(input: { eventId: string; scheduleId?: string; queue: string }): Promise<Run>;
+  createRun(input: { eventId: string; agentId?: string; scheduleId?: string; queue: string }): Promise<Run>;
   listRuns(): Promise<Run[]>;
   getRun(id: string): Promise<Run | undefined>;
+  getRunByEvent(eventId: string): Promise<Run | undefined>;
   updateRun(id: string, patch: Partial<Run>): Promise<Run | undefined>;
   appendLog(input: Omit<RunLog, "id" | "at">): Promise<RunLog>;
   listRunLogs(runId: string): Promise<RunLog[]>;
+  listAgents(): Promise<AgentDefinition[]>;
+  getAgent(id: string): Promise<AgentDefinition | undefined>;
+  upsertAgent(input: AgentDefinition): Promise<AgentDefinition>;
+  createArtifact(input: Omit<RunArtifact, "id" | "createdAt">): Promise<RunArtifact>;
+  listRunArtifacts(runId: string): Promise<RunArtifact[]>;
 }
 
 function now(): string {
@@ -45,6 +53,8 @@ export class MemoryStore implements Store {
   private events = new Map<string, EventEnvelope>();
   private runs = new Map<string, Run>();
   private logs = new Map<string, RunLog[]>();
+  private agents = new Map<string, AgentDefinition>();
+  private artifacts = new Map<string, RunArtifact[]>();
 
   async listSchedules(): Promise<Schedule[]> {
     return [...this.schedules.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -53,7 +63,7 @@ export class MemoryStore implements Store {
   async createSchedule(input: CreateScheduleInput): Promise<Schedule> {
     const at = now();
     const schedule: Schedule = {
-      id: id("sch"),
+      id: input.id ?? id("sch"),
       name: input.name,
       expression: input.expression,
       timezone: input.timezone ?? "UTC",
@@ -65,6 +75,23 @@ export class MemoryStore implements Store {
     };
     this.schedules.set(schedule.id, schedule);
     return schedule;
+  }
+
+  async upsertSchedule(input: CreateScheduleInput): Promise<Schedule> {
+    const existing = input.id ? this.schedules.get(input.id) : undefined;
+    if (!existing) return this.createSchedule(input);
+    const updated: Schedule = {
+      ...existing,
+      name: input.name,
+      expression: input.expression,
+      timezone: input.timezone ?? "UTC",
+      enabled: input.enabled ?? true,
+      event: input.event,
+      queue: input.queue ?? "default",
+      updatedAt: now()
+    };
+    this.schedules.set(updated.id, updated);
+    return updated;
   }
 
   async updateSchedule(idValue: string, input: UpdateScheduleInput): Promise<Schedule | undefined> {
@@ -89,6 +116,10 @@ export class MemoryStore implements Store {
   }
 
   async createEvent(input: Omit<EventEnvelope, "id" | "createdAt">): Promise<EventEnvelope> {
+    if (input.dedupeKey) {
+      const existing = [...this.events.values()].find((event) => event.dedupeKey === input.dedupeKey);
+      if (existing) return existing;
+    }
     const event: EventEnvelope = {
       ...input,
       id: id("evt"),
@@ -98,15 +129,17 @@ export class MemoryStore implements Store {
     return event;
   }
 
-  async createRun(input: { eventId: string; scheduleId?: string; queue: string }): Promise<Run> {
+  async createRun(input: { eventId: string; agentId?: string; scheduleId?: string; queue: string }): Promise<Run> {
     const at = now();
     const run: Run = {
       id: id("run"),
       eventId: input.eventId,
+      agentId: input.agentId,
       scheduleId: input.scheduleId,
       status: "queued",
       attempt: 1,
       queue: input.queue,
+      artifactCount: 0,
       createdAt: at,
       updatedAt: at
     };
@@ -120,6 +153,10 @@ export class MemoryStore implements Store {
 
   async getRun(idValue: string): Promise<Run | undefined> {
     return this.runs.get(idValue);
+  }
+
+  async getRunByEvent(eventId: string): Promise<Run | undefined> {
+    return [...this.runs.values()].find((run) => run.eventId === eventId);
   }
 
   async updateRun(idValue: string, patch: Partial<Run>): Promise<Run | undefined> {
@@ -144,5 +181,40 @@ export class MemoryStore implements Store {
 
   async listRunLogs(runId: string): Promise<RunLog[]> {
     return this.logs.get(runId) ?? [];
+  }
+
+  async listAgents(): Promise<AgentDefinition[]> {
+    return [...this.agents.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async getAgent(idValue: string): Promise<AgentDefinition | undefined> {
+    return this.agents.get(idValue);
+  }
+
+  async upsertAgent(input: AgentDefinition): Promise<AgentDefinition> {
+    const existing = this.agents.get(input.id);
+    const agent = existing ? { ...input, createdAt: existing.createdAt, updatedAt: now() } : input;
+    this.agents.set(agent.id, agent);
+    return agent;
+  }
+
+  async createArtifact(input: Omit<RunArtifact, "id" | "createdAt">): Promise<RunArtifact> {
+    const artifact: RunArtifact = {
+      ...input,
+      id: id("art"),
+      createdAt: now()
+    };
+    const current = this.artifacts.get(artifact.runId) ?? [];
+    current.push(artifact);
+    this.artifacts.set(artifact.runId, current);
+    const run = this.runs.get(artifact.runId);
+    if (run) {
+      this.runs.set(run.id, { ...run, artifactCount: current.length, updatedAt: now() });
+    }
+    return artifact;
+  }
+
+  async listRunArtifacts(runId: string): Promise<RunArtifact[]> {
+    return this.artifacts.get(runId) ?? [];
   }
 }

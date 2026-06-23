@@ -1,9 +1,33 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildApp } from "../src/server/app.js";
+import { seedDefaultAgents } from "../src/server/bootstrap.js";
+import { MemoryStore } from "../src/server/store.js";
 
 test("api smoke flow", async () => {
-  const app = await buildApp({ config: { authToken: "test-token", host: "127.0.0.1", port: 0 } });
+  const store = new MemoryStore();
+  await seedDefaultAgents(store, {
+    authToken: "test-token",
+    host: "127.0.0.1",
+    port: 0,
+    reportsBucket: "test-bucket",
+    stockAgentId: "agent_stock_report_daily",
+    stockAgentScheduleId: "sch_stock_report_daily",
+    stockAgentScheduleExpression: "cron(0 9 * * ? *)",
+    stockAgentScheduleTimezone: "America/Los_Angeles"
+  });
+  const app = await buildApp({
+    config: {
+      authToken: "test-token",
+      host: "127.0.0.1",
+      port: 0,
+      stockAgentId: "agent_stock_report_daily",
+      stockAgentScheduleId: "sch_stock_report_daily",
+      stockAgentScheduleExpression: "cron(0 9 * * ? *)",
+      stockAgentScheduleTimezone: "America/Los_Angeles"
+    },
+    store
+  });
   await app.ready();
 
   const health = await app.inject({ method: "GET", url: "/api/health" });
@@ -14,6 +38,10 @@ test("api smoke flow", async () => {
   assert.equal(unauthorized.statusCode, 401);
 
   const auth = { authorization: "Bearer test-token" };
+  const agentsResponse = await app.inject({ method: "GET", url: "/api/agents", headers: auth });
+  assert.equal(agentsResponse.statusCode, 200);
+  assert.equal(agentsResponse.json().agents.length, 1);
+
   const scheduleResponse = await app.inject({
     method: "POST",
     url: "/api/schedules",

@@ -6,7 +6,7 @@ import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { loadConfig, runtimeMode, type AppConfig } from "../shared/config.js";
-import type { JobMessage } from "../shared/types.js";
+import type { AgentTriggerMessage, JobMessage } from "../shared/types.js";
 import { MemoryQueuePublisher, type QueuePublisher } from "./queue.js";
 import { MemoryStore, type Store } from "./store.js";
 
@@ -75,6 +75,14 @@ export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInsta
 
   app.get("/api/schedules", async () => ({ schedules: await store.listSchedules() }));
 
+  app.get("/api/agents", async () => ({ agents: await store.listAgents() }));
+
+  app.get<{ Params: { id: string } }>("/api/agents/:id", async (request, reply) => {
+    const agent = await store.getAgent(request.params.id);
+    if (!agent) return reply.code(404).send({ error: "Agent not found" });
+    return { agent };
+  });
+
   app.post("/api/schedules", async (request, reply) => {
     const parsed = scheduleInputSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "Invalid schedule", details: parsed.error.flatten() });
@@ -99,9 +107,20 @@ export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInsta
   app.post<{ Params: { id: string } }>("/api/schedules/:id/trigger", async (request, reply) => {
     const schedule = (await store.listSchedules()).find((candidate) => candidate.id === request.params.id);
     if (!schedule) return reply.code(404).send({ error: "Schedule not found" });
+    if (schedule.event.type === "agent.trigger" && typeof schedule.event.payload.agentId === "string") {
+      const message: AgentTriggerMessage = {
+        kind: "agent.trigger",
+        scheduleId: schedule.id,
+        agentId: schedule.event.payload.agentId,
+        firedAt: new Date().toISOString(),
+        dedupeKey: `${schedule.id}:${new Date().toISOString().slice(0, 10)}:${schedule.event.payload.agentId}`
+      };
+      await queue.publish(message);
+      return reply.code(202).send({ queued: true, message });
+    }
     const event = await store.createEvent(schedule.event);
     const run = await store.createRun({ eventId: event.id, scheduleId: schedule.id, queue: schedule.queue });
-    await queue.publish({ runId: run.id, eventId: event.id, queue: run.queue, attempt: run.attempt });
+    await queue.publish({ kind: "run", runId: run.id, eventId: event.id, queue: run.queue, attempt: run.attempt });
     await store.appendLog({ runId: run.id, stream: "system", message: `Run queued from schedule ${schedule.name}.` });
     return reply.code(202).send({ event, run });
   });
@@ -111,7 +130,13 @@ export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInsta
   app.get<{ Params: { id: string } }>("/api/runs/:id", async (request, reply) => {
     const run = await store.getRun(request.params.id);
     if (!run) return reply.code(404).send({ error: "Run not found" });
-    return { run, logs: await store.listRunLogs(run.id) };
+    return { run, logs: await store.listRunLogs(run.id), artifacts: await store.listRunArtifacts(run.id) };
+  });
+
+  app.get<{ Params: { id: string } }>("/api/runs/:id/artifacts", async (request, reply) => {
+    const run = await store.getRun(request.params.id);
+    if (!run) return reply.code(404).send({ error: "Run not found" });
+    return { artifacts: await store.listRunArtifacts(run.id) };
   });
 
   app.post<{ Params: { id: string } }>("/api/runs/:id/cancel", async (request, reply) => {

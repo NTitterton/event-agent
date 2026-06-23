@@ -6,23 +6,36 @@ if (tokenInput) {
 
 async function load(): Promise<void> {
   const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "dev-token";
-  const [schedulesResponse, runsResponse] = await Promise.all([
+  const [agentsResponse, schedulesResponse, runsResponse] = await Promise.all([
+    fetch("/api/agents", { headers: { authorization: `Bearer ${token}` } }),
     fetch("/api/schedules", { headers: { authorization: `Bearer ${token}` } }),
     fetch("/api/runs", { headers: { authorization: `Bearer ${token}` } })
   ]);
 
+  const agentsEl = document.querySelector("#agents");
   const schedulesEl = document.querySelector("#schedules");
   const runsEl = document.querySelector("#runs");
-  if (!schedulesEl || !runsEl) return;
+  if (!agentsEl || !schedulesEl || !runsEl) return;
 
-  if (!schedulesResponse.ok || !runsResponse.ok) {
+  if (!agentsResponse.ok || !schedulesResponse.ok || !runsResponse.ok) {
+    agentsEl.textContent = "API unavailable or unauthorized.";
     schedulesEl.textContent = "API unavailable or unauthorized.";
     runsEl.textContent = "Enter the API token and refresh.";
     return;
   }
 
+  const agentsJson = (await agentsResponse.json()) as { agents: Array<{ name: string; modelProvider: string; model: string; enabled: boolean }> };
   const schedulesJson = (await schedulesResponse.json()) as { schedules: Array<{ name: string; expression: string; queue: string }> };
-  const runsJson = (await runsResponse.json()) as { runs: Array<{ id: string; status: string; queue: string; createdAt: string }> };
+  const runsJson = (await runsResponse.json()) as { runs: Array<{ id: string; status: string; queue: string; createdAt: string; artifactCount?: number }> };
+
+  agentsEl.innerHTML = agentsJson.agents.length
+    ? agentsJson.agents
+        .map(
+          (agent) =>
+            `<div class="row"><strong>${escapeHtml(agent.name)}</strong><span>${escapeHtml(agent.modelProvider)} / ${escapeHtml(agent.model)} · ${agent.enabled ? "enabled" : "disabled"}</span></div>`
+        )
+        .join("")
+    : "No agents yet.";
 
   schedulesEl.innerHTML = schedulesJson.schedules.length
     ? schedulesJson.schedules
@@ -32,7 +45,10 @@ async function load(): Promise<void> {
 
   runsEl.innerHTML = runsJson.runs.length
     ? runsJson.runs
-        .map((run) => `<div class="row"><strong>${escapeHtml(run.status)}</strong><span>${escapeHtml(run.id)} on ${escapeHtml(run.queue)}</span></div>`)
+        .map(
+          (run) =>
+            `<div class="row"><strong>${escapeHtml(run.status)}</strong><span>${escapeHtml(run.id)} on ${escapeHtml(run.queue)} · ${run.artifactCount ?? 0} artifacts</span></div>`
+        )
         .join("")
     : "No runs yet.";
 }

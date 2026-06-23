@@ -12,6 +12,7 @@ This repo is an initial scaffold. It includes:
 - A TypeScript API/control-plane skeleton.
 - A TypeScript worker skeleton.
 - Shared event, schedule, run, and worker types.
+- A seeded data-driven daily stock-report prompt agent.
 - A minimal browser UI shell.
 - Verification scripts that run without provisioning AWS resources.
 - Infrastructure notes for the AWS-first deployment path.
@@ -52,7 +53,7 @@ npm run test
 npm run smoke
 ```
 
-`npm run smoke` starts the API on a temporary port, checks health, verifies bearer-token enforcement, creates an in-memory schedule, triggers a run, and confirms run listing works.
+`npm run smoke` starts the API on a temporary port, checks health, verifies bearer-token enforcement, seeds the example prompt agent, creates an in-memory schedule, triggers a run, and confirms run listing works.
 
 ## Configuration
 
@@ -64,6 +65,9 @@ Core environment variables:
 - `EVENT_AGENT_DATABASE_URL`: RDS PostgreSQL connection string.
 - `EVENT_AGENT_DATABASE_HOST`, `EVENT_AGENT_DATABASE_PORT`, `EVENT_AGENT_DATABASE_NAME`, `EVENT_AGENT_DATABASE_USER`, `EVENT_AGENT_DATABASE_PASSWORD`: split RDS connection settings used by ECS secrets.
 - `EVENT_AGENT_DEFAULT_QUEUE_URL`: default SQS queue URL.
+- `EVENT_AGENT_REPORTS_BUCKET`: S3 bucket for generated report artifacts.
+- `OPENAI_API_KEY`: direct OpenAI API key. The deployed placeholder uses a deterministic local provider until replaced.
+- `EVENT_AGENT_STOCK_AGENT_*`: seeded daily stock prompt-agent id, schedule id, cron expression, and timezone.
 - `EVENT_AGENT_EVENT_BUS_NAME`: optional EventBridge bus name for future fanout.
 
 ## Infrastructure
@@ -77,7 +81,7 @@ npm run infra:diff
 npm run infra:deploy
 ```
 
-The initial stack defines VPC networking, RDS PostgreSQL, SQS default/DLQ queues, ECS/Fargate API and worker services, generated API/database secrets, CloudWatch logs, and an EventBridge Scheduler group/role. Deploying it creates billable AWS resources. `npx cdk bootstrap` is required once per AWS account/region before the first asset-based deployment.
+The initial stack defines VPC networking, RDS PostgreSQL, SQS default/DLQ queues, an S3 reports bucket, ECS/Fargate API and worker services, generated API/database secrets, an OpenAI API key secret placeholder, CloudWatch logs, and an EventBridge Scheduler group/role with a daily stock-report schedule. Deploying it creates billable AWS resources. `npx cdk bootstrap` is required once per AWS account/region before the first asset-based deployment.
 
 Cloud integration tests will require explicit opt-in variables before they touch AWS resources.
 
@@ -88,8 +92,10 @@ The intended flow is:
 1. A schedule, API request, webhook, or internal event creates an `EventEnvelope`.
 2. The control plane writes durable event/run records.
 3. The control plane publishes an executable job to a queue selected by required worker capability.
-4. A worker leases the job, executes it in a constrained context, streams logs, and updates run status.
+4. A worker leases the job, resolves prompt-agent inputs, calls the configured model provider, writes artifacts to S3, streams logs, and updates run status.
 5. Failed jobs retry according to policy and eventually move to dead-letter state.
+
+Agents are data, not per-agent TypeScript modules. The daily stock example is a seeded prompt-agent definition with prompt text, input resolver config, model provider/model, and S3 output settings. TypeScript code supplies reusable execution primitives such as SQS polling, input resolution, model-provider adapters, and artifact writing.
 
 See [project_spec.md](project_spec.md) and [project_design.md](project_design.md) for the living product and architecture docs.
 
