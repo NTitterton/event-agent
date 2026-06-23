@@ -1,4 +1,9 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
+import { createReadStream } from "node:fs";
+import { access } from "node:fs/promises";
+import { constants } from "node:fs";
+import { dirname, extname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { loadConfig, runtimeMode, type AppConfig } from "../shared/config.js";
 import type { JobMessage } from "../shared/types.js";
@@ -33,14 +38,22 @@ export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInsta
   const store = deps.store ?? new MemoryStore();
   const queue = deps.queue ?? new MemoryQueuePublisher();
   const app = Fastify({ logger: false });
+  const uiDistPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../dist/ui");
 
   app.addHook("preHandler", async (request, reply) => {
     if (request.url === "/api/health") return;
+    if (!request.url.startsWith("/api/")) return;
     const auth = request.headers.authorization;
     if (auth !== `Bearer ${config.authToken}`) {
       await reply.code(401).send({ error: "Unauthorized" });
     }
   });
+
+  app.get("/", async (_request, reply) => sendUiAsset(reply, uiDistPath, "index.html"));
+
+  app.get<{ Params: { "*": string } }>("/assets/*", async (request, reply) =>
+    sendUiAsset(reply, uiDistPath, `assets/${request.params["*"]}`)
+  );
 
   app.get("/api/health", async () => ({
     ok: true,
@@ -129,3 +142,27 @@ export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInsta
   return app;
 }
 
+async function sendUiAsset(reply: FastifyReply, uiDistPath: string, assetPath: string) {
+  const absoluteAssetPath = resolve(uiDistPath, assetPath);
+  if (!absoluteAssetPath.startsWith(`${uiDistPath}/`) && absoluteAssetPath !== uiDistPath) {
+    return reply.code(404).send({ error: "Not found" });
+  }
+
+  try {
+    await access(absoluteAssetPath, constants.R_OK);
+  } catch {
+    return reply.code(404).send({ error: "UI has not been built" });
+  }
+
+  return reply.type(contentTypeFor(absoluteAssetPath)).send(createReadStream(absoluteAssetPath));
+}
+
+function contentTypeFor(assetPath: string): string {
+  const extension = extname(assetPath);
+  if (extension === ".html") return "text/html; charset=utf-8";
+  if (extension === ".js") return "text/javascript; charset=utf-8";
+  if (extension === ".css") return "text/css; charset=utf-8";
+  if (extension === ".svg") return "image/svg+xml";
+  if (extension === ".png") return "image/png";
+  return "application/octet-stream";
+}

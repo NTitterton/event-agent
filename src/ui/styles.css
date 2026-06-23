@@ -49,6 +49,21 @@ button {
   padding: 10px 14px;
 }
 
+input {
+  background: #fff;
+  border: 1px solid #cfd6e4;
+  border-radius: 6px;
+  color: #15171a;
+  min-width: 240px;
+  padding: 9px 10px;
+}
+
+.actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
 .eyebrow {
   color: #667085;
   font-size: 12px;
@@ -99,8 +114,17 @@ article {
     padding: 20px;
   }
 
+  header,
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  input {
+    min-width: 0;
+  }
+
   .grid {
     grid-template-columns: 1fr;
   }
 }
-

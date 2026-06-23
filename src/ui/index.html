@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Event Agent</title>
-    <link rel="stylesheet" href="/src/ui/styles.css" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="shell">
@@ -13,7 +13,11 @@
           <p class="eyebrow">Cloud event runtime</p>
           <h1>Event Agent</h1>
         </div>
-        <button id="refresh" type="button">Refresh</button>
+        <div class="actions">
+          <input id="token" type="password" autocomplete="off" placeholder="API token" />
+          <button id="save-token" type="button">Save</button>
+          <button id="refresh" type="button">Refresh</button>
+        </div>
       </header>
 
       <section class="grid">
@@ -28,7 +32,6 @@
         </article>
       </section>
     </main>
-    <script type="module" src="/src/ui/main.ts"></script>
+    <script type="module" src="./main.ts"></script>
   </body>
 </html>
-

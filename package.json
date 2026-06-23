@@ -8,6 +8,7 @@
     "dev:api": "tsx src/server/index.ts",
     "dev:worker": "tsx src/worker/index.ts",
     "dev:ui": "vite src/ui --host 127.0.0.1",
+    "build:ui": "vite build src/ui --outDir ../../dist/ui --emptyOutDir",
     "check": "tsc --noEmit",
     "test": "node --test --import tsx scripts/*.test.ts",
     "smoke": "tsx scripts/smoke-test.ts",
