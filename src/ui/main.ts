@@ -1,21 +1,32 @@
 const tokenInput = document.querySelector<HTMLInputElement>("#token");
+let loadSequence = 0;
 
 if (tokenInput) {
   tokenInput.value = window.localStorage.getItem("event-agent-token") ?? "";
 }
 
 async function load(): Promise<void> {
-  const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "dev-token";
+  const sequence = ++loadSequence;
+  const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "";
+  const agentsEl = document.querySelector("#agents");
+  const schedulesEl = document.querySelector("#schedules");
+  const runsEl = document.querySelector("#runs");
+  if (!agentsEl || !schedulesEl || !runsEl) return;
+
+  if (!token) {
+    agentsEl.textContent = "Enter the API token and refresh.";
+    schedulesEl.textContent = "Enter the API token and refresh.";
+    runsEl.textContent = "Enter the API token and refresh.";
+    return;
+  }
+
   const [agentsResponse, schedulesResponse, runsResponse] = await Promise.all([
     fetch("/api/agents", { headers: { authorization: `Bearer ${token}` } }),
     fetch("/api/schedules", { headers: { authorization: `Bearer ${token}` } }),
     fetch("/api/runs", { headers: { authorization: `Bearer ${token}` } })
   ]);
 
-  const agentsEl = document.querySelector("#agents");
-  const schedulesEl = document.querySelector("#schedules");
-  const runsEl = document.querySelector("#runs");
-  if (!agentsEl || !schedulesEl || !runsEl) return;
+  if (sequence !== loadSequence) return;
 
   if (!agentsResponse.ok || !schedulesResponse.ok || !runsResponse.ok) {
     agentsEl.textContent = "API unavailable or unauthorized.";
@@ -73,6 +84,7 @@ document.querySelector("#refresh")?.addEventListener("click", () => {
 document.querySelector("#save-token")?.addEventListener("click", () => {
   const token = tokenInput?.value.trim();
   if (token) window.localStorage.setItem("event-agent-token", token);
+  if (!token) window.localStorage.removeItem("event-agent-token");
   void load();
 });
 
