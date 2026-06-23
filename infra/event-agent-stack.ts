@@ -118,6 +118,15 @@ export class EventAgentStack extends Stack {
     const reportsBucket = new s3.Bucket(this, "ReportsBucket", {
       bucketName: `${name}-reports-${this.account}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      cors: [
+        {
+          allowedHeaders: ["*"],
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
+          allowedOrigins: ["*"],
+          exposedHeaders: ["etag"],
+          maxAge: 300
+        }
+      ],
       encryption: s3.BucketEncryption.S3_MANAGED,
       enforceSSL: true,
       versioned: true,

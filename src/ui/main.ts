@@ -205,7 +205,13 @@ async function previewArtifact(artifactId: string | undefined): Promise<void> {
     return;
   }
 
-  const response = await fetch(access.access.url);
+  let response: Response;
+  try {
+    response = await fetch(access.access.url);
+  } catch {
+    previewEl.textContent = "Artifact preview unavailable.";
+    return;
+  }
   if (!response.ok) {
     previewEl.textContent = "Artifact preview unavailable.";
     return;
