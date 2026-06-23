@@ -49,6 +49,11 @@ button {
   padding: 10px 14px;
 }
 
+button.secondary {
+  background: #eef2f8;
+  color: #344054;
+}
+
 input {
   background: #fff;
   border: 1px solid #cfd6e4;
@@ -87,6 +92,21 @@ article {
   padding: 18px;
 }
 
+.detail-panel {
+  background: #fff;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  margin-top: 16px;
+  padding: 18px;
+}
+
+.detail-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
 .list {
   display: grid;
   gap: 8px;
@@ -104,9 +124,94 @@ article {
   padding: 10px;
 }
 
+.row-button {
+  background: #fff;
+  color: #15171a;
+  text-align: left;
+  width: 100%;
+}
+
+.row-button:hover,
+.row-button.selected {
+  border-color: #155eef;
+}
+
 .row span {
   color: #667085;
   font-size: 13px;
+}
+
+.row code {
+  color: #344054;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+h3 {
+  font-size: 14px;
+  margin: 18px 0 10px;
+}
+
+.detail-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.detail-item {
+  border: 1px solid #e4e7ec;
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.detail-item span {
+  color: #667085;
+  font-size: 12px;
+}
+
+.detail-item strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.error-box {
+  background: #fff4f3;
+  border: 1px solid #fecdca;
+  border-radius: 6px;
+  color: #b42318;
+  margin-top: 12px;
+  padding: 10px;
+}
+
+.log-list {
+  border: 1px solid #e4e7ec;
+  border-radius: 6px;
+  display: grid;
+}
+
+.log-row {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 170px 72px minmax(0, 1fr);
+  padding: 10px;
+}
+
+.log-row + .log-row {
+  border-top: 1px solid #e4e7ec;
+}
+
+.log-row span,
+.log-row strong {
+  color: #667085;
+  font-size: 12px;
+}
+
+.log-row p {
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 720px) {
@@ -125,6 +230,11 @@ article {
   }
 
   .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-grid,
+  .log-row {
     grid-template-columns: 1fr;
   }
 }
