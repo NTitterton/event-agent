@@ -40,6 +40,21 @@ interface ArtifactAccess {
   };
 }
 
+interface AgentSummary {
+  name: string;
+  modelProvider: string;
+  model: string;
+  enabled: boolean;
+}
+
+interface ScheduleSummary {
+  id: string;
+  name: string;
+  expression: string;
+  queue: string;
+  enabled: boolean;
+}
+
 async function load(): Promise<void> {
   const sequence = ++loadSequence;
   const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "";
@@ -73,8 +88,8 @@ async function load(): Promise<void> {
     return;
   }
 
-  const agentsJson = (await agentsResponse.json()) as { agents: Array<{ name: string; modelProvider: string; model: string; enabled: boolean }> };
-  const schedulesJson = (await schedulesResponse.json()) as { schedules: Array<{ name: string; expression: string; queue: string }> };
+  const agentsJson = (await agentsResponse.json()) as { agents: AgentSummary[] };
+  const schedulesJson = (await schedulesResponse.json()) as { schedules: ScheduleSummary[] };
   const runsJson = (await runsResponse.json()) as { runs: RunSummary[] };
 
   agentsEl.innerHTML = agentsJson.agents.length
@@ -88,9 +103,18 @@ async function load(): Promise<void> {
 
   schedulesEl.innerHTML = schedulesJson.schedules.length
     ? schedulesJson.schedules
-        .map((schedule) => `<div class="row"><strong>${escapeHtml(schedule.name)}</strong><span>${escapeHtml(schedule.expression)} -> ${escapeHtml(schedule.queue)}</span></div>`)
+        .map(
+          (schedule) =>
+            `<div class="row schedule-row"><div><strong>${escapeHtml(schedule.name)}</strong><span>${escapeHtml(schedule.expression)} -> ${escapeHtml(schedule.queue)} · ${schedule.enabled ? "enabled" : "paused"}</span></div><button class="secondary compact" type="button" data-schedule-trigger-id="${escapeHtml(schedule.id)}">Run now</button></div>`
+        )
         .join("")
     : "No schedules yet.";
+
+  schedulesEl.querySelectorAll<HTMLButtonElement>("[data-schedule-trigger-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      void triggerSchedule(button.dataset.scheduleTriggerId, button);
+    });
+  });
 
   runsEl.innerHTML = runsJson.runs.length
     ? runsJson.runs
@@ -230,6 +254,48 @@ async function loadArtifactAccess(artifactId: string | undefined): Promise<Artif
   });
   if (!response.ok) return;
   return (await response.json()) as ArtifactAccess;
+}
+
+async function triggerSchedule(scheduleId: string | undefined, button: HTMLButtonElement): Promise<void> {
+  if (!scheduleId) return;
+  const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "";
+  if (!token) {
+    setStatus("Enter the API token before triggering a schedule.", true);
+    return;
+  }
+
+  button.disabled = true;
+  setStatus("Queueing schedule run...");
+  try {
+    const response = await fetch(`/api/schedules/${encodeURIComponent(scheduleId)}/trigger`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) {
+      setStatus("Schedule trigger failed.", true);
+      return;
+    }
+
+    const json = (await response.json()) as { run?: RunSummary; message?: unknown };
+    if (json.run?.id) selectedRunId = json.run.id;
+    setStatus("Schedule run queued.");
+    await load();
+    window.setTimeout(() => {
+      void load();
+    }, 1800);
+  } catch {
+    setStatus("Schedule trigger failed.", true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function setStatus(message: string, isError = false): void {
+  const statusEl = document.querySelector("#status");
+  if (!statusEl) return;
+  statusEl.textContent = message;
+  statusEl.classList.toggle("error-text", isError);
+  statusEl.classList.toggle("muted", !isError);
 }
 
 function renderLogs(logs: RunLog[]): string {

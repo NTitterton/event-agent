@@ -6,6 +6,7 @@ This is the living list of features and platform work we want to consider after 
 
 - Agent detail view: show prompt, model provider, model, config, output target, schedules, recent runs, logs, and artifacts.
 - Agent editor: create/update data-driven prompt agents without adding TypeScript files.
+- [Done] Manual schedule trigger: queue an existing schedule from the UI with a `Run now` action.
 - Manual run form: trigger an agent immediately with optional input overrides.
 - [Done] Run detail page: show logs, status transitions, selected inputs, model metadata, and generated artifacts.
 - [Done] Artifact browser: list S3 reports, preview markdown, and download artifacts through authenticated API routes.
