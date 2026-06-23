@@ -111,12 +111,13 @@ export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInsta
     const schedule = (await store.listSchedules()).find((candidate) => candidate.id === request.params.id);
     if (!schedule) return reply.code(404).send({ error: "Schedule not found" });
     if (schedule.event.type === "agent.trigger" && typeof schedule.event.payload.agentId === "string") {
+      const firedAt = new Date().toISOString();
       const message: AgentTriggerMessage = {
         kind: "agent.trigger",
         scheduleId: schedule.id,
         agentId: schedule.event.payload.agentId,
-        firedAt: new Date().toISOString(),
-        dedupeKey: `${schedule.id}:${new Date().toISOString().slice(0, 10)}:${schedule.event.payload.agentId}`
+        firedAt,
+        dedupeKey: `manual:${schedule.id}:${firedAt}:${crypto.randomUUID()}`
       };
       await queue.publish(message);
       return reply.code(202).send({ queued: true, message });

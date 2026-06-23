@@ -42,6 +42,17 @@ test("api smoke flow", async () => {
   assert.equal(agentsResponse.statusCode, 200);
   assert.equal(agentsResponse.json().agents.length, 1);
 
+  const seededTriggerResponse = await app.inject({
+    method: "POST",
+    url: "/api/schedules/sch_stock_report_daily/trigger",
+    headers: auth
+  });
+  assert.equal(seededTriggerResponse.statusCode, 202);
+  const seededTrigger = seededTriggerResponse.json() as { queued: boolean; message: { kind: string; dedupeKey: string } };
+  assert.equal(seededTrigger.queued, true);
+  assert.equal(seededTrigger.message.kind, "agent.trigger");
+  assert.match(seededTrigger.message.dedupeKey, /^manual:sch_stock_report_daily:/);
+
   const scheduleResponse = await app.inject({
     method: "POST",
     url: "/api/schedules",
