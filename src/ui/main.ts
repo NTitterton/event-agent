@@ -33,6 +33,13 @@ interface RunArtifact {
   contentType: string;
 }
 
+interface ArtifactAccess {
+  access: {
+    url: string;
+    expiresAt: string;
+  };
+}
+
 async function load(): Promise<void> {
   const sequence = ++loadSequence;
   const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "";
@@ -151,12 +158,18 @@ async function loadRunDetail(): Promise<void> {
     ${run.error ? `<div class="error-box">${escapeHtml(run.error)}</div>` : ""}
     <h3>Artifacts</h3>
     <div class="list">${renderArtifacts(json.artifacts)}</div>
+    <div id="artifact-preview" class="artifact-preview muted">Select an artifact preview.</div>
     <h3>Logs</h3>
     <div class="log-list">${renderLogs(json.logs)}</div>
   `;
-  runDetailEl.querySelectorAll<HTMLButtonElement>("[data-artifact-id]").forEach((button) => {
+  runDetailEl.querySelectorAll<HTMLButtonElement>("[data-artifact-open-id]").forEach((button) => {
     button.addEventListener("click", () => {
-      void openArtifact(button.dataset.artifactId);
+      void openArtifact(button.dataset.artifactOpenId);
+    });
+  });
+  runDetailEl.querySelectorAll<HTMLButtonElement>("[data-artifact-preview-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      void previewArtifact(button.dataset.artifactPreviewId);
     });
   });
 }
@@ -170,12 +183,39 @@ function renderArtifacts(artifacts: RunArtifact[]): string {
   return artifacts
     .map(
       (artifact) =>
-        `<div class="row artifact-row"><div><strong>${escapeHtml(artifact.title)}</strong><span>${escapeHtml(artifact.ticker ?? "artifact")} · ${escapeHtml(artifact.contentType)}</span><code>s3://${escapeHtml(artifact.bucket)}/${escapeHtml(artifact.key)}</code></div><button class="secondary" type="button" data-artifact-id="${escapeHtml(artifact.id)}">Open</button></div>`
+        `<div class="row artifact-row"><div class="artifact-main"><strong>${escapeHtml(artifact.title)}</strong><span>${escapeHtml(artifact.ticker ?? "artifact")} · ${escapeHtml(artifact.contentType)}</span><code>s3://${escapeHtml(artifact.bucket)}/${escapeHtml(artifact.key)}</code></div><div class="artifact-actions"><button class="secondary" type="button" data-artifact-preview-id="${escapeHtml(artifact.id)}">Preview</button><button class="secondary" type="button" data-artifact-open-id="${escapeHtml(artifact.id)}">Open</button></div></div>`
     )
     .join("");
 }
 
 async function openArtifact(artifactId: string | undefined): Promise<void> {
+  const access = await loadArtifactAccess(artifactId);
+  if (!access) return;
+  window.open(access.access.url, "_blank", "noopener,noreferrer");
+}
+
+async function previewArtifact(artifactId: string | undefined): Promise<void> {
+  const previewEl = document.querySelector("#artifact-preview");
+  if (!previewEl) return;
+  previewEl.classList.add("muted");
+  previewEl.textContent = "Loading artifact preview...";
+  const access = await loadArtifactAccess(artifactId);
+  if (!access) {
+    previewEl.textContent = "Artifact preview unavailable.";
+    return;
+  }
+
+  const response = await fetch(access.access.url);
+  if (!response.ok) {
+    previewEl.textContent = "Artifact preview unavailable.";
+    return;
+  }
+  const markdown = await response.text();
+  previewEl.classList.remove("muted");
+  previewEl.innerHTML = `<div class="preview-heading"><strong>Markdown Preview</strong><span>Link expires ${escapeHtml(formatTime(access.access.expiresAt))}</span></div><pre>${escapeHtml(markdown)}</pre>`;
+}
+
+async function loadArtifactAccess(artifactId: string | undefined): Promise<ArtifactAccess | undefined> {
   if (!artifactId) return;
   const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "";
   if (!token) return;
@@ -183,8 +223,7 @@ async function openArtifact(artifactId: string | undefined): Promise<void> {
     headers: { authorization: `Bearer ${token}` }
   });
   if (!response.ok) return;
-  const json = (await response.json()) as { access: { url: string } };
-  window.open(json.access.url, "_blank", "noopener,noreferrer");
+  return (await response.json()) as ArtifactAccess;
 }
 
 function renderLogs(logs: RunLog[]): string {
