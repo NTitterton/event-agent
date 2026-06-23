@@ -116,7 +116,8 @@ export class EventAgentStack extends Stack {
     });
 
     const image = new ecrAssets.DockerImageAsset(this, "AppImage", {
-      directory: "."
+      directory: ".",
+      platform: ecrAssets.Platform.LINUX_AMD64
     });
 
     const apiLogGroup = new logs.LogGroup(this, "ApiLogGroup", {
