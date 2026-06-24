@@ -35,7 +35,7 @@ export class OpenAiModelProvider implements ModelProvider {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`OpenAI request failed with ${response.status}: ${body.slice(0, 400)}`);
+      throw new Error(formatOpenAiError(response.status, body));
     }
 
     const json = (await response.json()) as {
@@ -47,6 +47,26 @@ export class OpenAiModelProvider implements ModelProvider {
     if (!text) throw new Error("OpenAI response did not contain text output");
     return text;
   }
+}
+
+function formatOpenAiError(status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body) as {
+      error?: {
+        message?: string;
+        type?: string;
+        code?: string | null;
+      };
+    };
+    const error = parsed.error;
+    if (error?.message) {
+      const code = error.code ?? error.type ?? "unknown";
+      return `OpenAI request failed with ${status} ${code}: ${error.message}`;
+    }
+  } catch {
+    // Fall through to the raw snippet when OpenAI returns non-JSON.
+  }
+  return `OpenAI request failed with ${status}: ${body.replace(/\s+/g, " ").slice(0, 400)}`;
 }
 
 export class StaticModelProvider implements ModelProvider {

@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS deps
+FROM node:22-bookworm-slim@sha256:b1e7fcc44bd47f2d186de26c1202345369e7f1028b08956e75cfb52ad8e483f9 AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -9,7 +9,7 @@ COPY src ./src
 COPY tsconfig.json ./
 RUN npm run build:ui
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:22-bookworm-slim@sha256:b1e7fcc44bd47f2d186de26c1202345369e7f1028b08956e75cfb52ad8e483f9 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules

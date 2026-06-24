@@ -1,6 +1,6 @@
 import { DeleteMessageCommand, ReceiveMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { LocalArtifactWriter, S3ArtifactWriter, type ArtifactWriter } from "../agents/artifact-writer.js";
-import { OpenAiModelProvider, StaticModelProvider, type ModelProvider } from "../agents/model-provider.js";
+import { OpenAiModelProvider, type ModelProvider } from "../agents/model-provider.js";
 import { executePromptAgent } from "../agents/prompt-executor.js";
 import { seedDefaultAgents } from "../server/bootstrap.js";
 import { PgStore } from "../server/pg-store.js";
@@ -33,8 +33,7 @@ export async function processJobMessage(input: {
 export async function startWorkerRuntime(config: AppConfig, workerId: string, deps: WorkerRuntimeDeps = {}): Promise<void> {
   const store = deps.store ?? new PgStore(config);
   await seedDefaultAgents(store, config);
-  const modelProvider =
-    deps.modelProvider ?? (config.openaiApiKey && config.openaiApiKey !== "replace-me" ? new OpenAiModelProvider(config) : new StaticModelProvider());
+  const modelProvider = deps.modelProvider ?? new OpenAiModelProvider(config);
   const artifactWriter = deps.artifactWriter ?? (config.reportsBucket ? new S3ArtifactWriter(config.awsRegion) : new LocalArtifactWriter());
   const client = new SQSClient(config.awsRegion ? { region: config.awsRegion } : {});
   if (!config.defaultQueueUrl) throw new Error("EVENT_AGENT_DEFAULT_QUEUE_URL is not configured");

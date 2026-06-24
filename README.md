@@ -70,7 +70,7 @@ Core environment variables:
 - `EVENT_AGENT_CONFIG_PREFIX`: S3 prefix for account config, default `accounts`.
 - `EVENT_AGENT_CONFIG_ACCOUNT_ID`: account config id to load. The deployed dev stack uses `default`; future scoped tokens can map to token-specific account ids.
 - `EVENT_AGENT_LOCAL_CONFIG_PATH`: local fallback config document path, default `config/accounts/default/agents.json`.
-- `OPENAI_API_KEY`: direct OpenAI API key. The deployed placeholder uses a deterministic local provider until replaced.
+- `OPENAI_API_KEY`: direct OpenAI API key. Hosted OpenAI-backed agents fail clearly if this is unset or still `replace-me`; deterministic model output is only used by tests or explicit local dependency injection.
 - `EVENT_AGENT_EVENT_BUS_NAME`: optional EventBridge bus name for future fanout.
 
 ## Infrastructure
