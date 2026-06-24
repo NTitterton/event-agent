@@ -145,7 +145,9 @@ export class EventAgentStack extends Stack {
 
     const defaultAgentConfigDeployment = new s3deploy.BucketDeployment(this, "DefaultAgentConfigDeployment", {
       sources: [s3deploy.Source.asset("config")],
-      destinationBucket: configBucket
+      destinationBucket: configBucket,
+      destinationKeyPrefix: "seed",
+      prune: false
     });
 
     const cluster = new ecs.Cluster(this, "Cluster", {
@@ -263,7 +265,7 @@ export class EventAgentStack extends Stack {
     defaultQueue.grantSendMessages(apiService.taskDefinition.taskRole);
     reportsBucket.grantRead(apiService.taskDefinition.taskRole);
     reportsBucket.grantWrite(workerTask.taskRole);
-    configBucket.grantRead(apiService.taskDefinition.taskRole);
+    configBucket.grantReadWrite(apiService.taskDefinition.taskRole);
     configBucket.grantRead(workerTask.taskRole);
     database.secret?.grantRead(apiService.taskDefinition.taskRole);
     database.secret?.grantRead(workerTask.taskRole);

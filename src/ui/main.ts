@@ -41,7 +41,9 @@ interface ArtifactAccess {
 }
 
 interface AgentSummary {
+  id: string;
   name: string;
+  description: string;
   modelProvider: string;
   model: string;
   enabled: boolean;
@@ -96,10 +98,16 @@ async function load(): Promise<void> {
     ? agentsJson.agents
         .map(
           (agent) =>
-            `<div class="row"><strong>${escapeHtml(agent.name)}</strong><span>${escapeHtml(agent.modelProvider)} / ${escapeHtml(agent.model)} · ${agent.enabled ? "enabled" : "disabled"}</span></div>`
+            `<div class="row agent-row"><div><strong>${escapeHtml(agent.name)}</strong><span>${escapeHtml(agent.modelProvider)} / ${escapeHtml(agent.model)} · ${agent.enabled ? "enabled" : "disabled"}</span></div><button class="secondary compact" type="button" data-agent-trigger-id="${escapeHtml(agent.id)}">Run now</button></div>`
         )
         .join("")
     : "No agents yet.";
+
+  agentsEl.querySelectorAll<HTMLButtonElement>("[data-agent-trigger-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      void triggerAgent(button.dataset.agentTriggerId, button);
+    });
+  });
 
   schedulesEl.innerHTML = schedulesJson.schedules.length
     ? schedulesJson.schedules
@@ -290,6 +298,88 @@ async function triggerSchedule(scheduleId: string | undefined, button: HTMLButto
   }
 }
 
+async function triggerAgent(agentId: string | undefined, button: HTMLButtonElement): Promise<void> {
+  if (!agentId) return;
+  const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "";
+  if (!token) {
+    setStatus("Enter the API token before triggering an agent.", true);
+    return;
+  }
+
+  button.disabled = true;
+  setStatus("Queueing agent run...");
+  try {
+    const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/trigger`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) {
+      setStatus("Agent trigger failed.", true);
+      return;
+    }
+
+    setStatus("Agent run queued.");
+    await load();
+    window.setTimeout(() => {
+      void load();
+    }, 1800);
+  } catch {
+    setStatus("Agent trigger failed.", true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function createAgent(form: HTMLFormElement): Promise<void> {
+  const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "";
+  if (!token) {
+    setStatus("Enter the API token before creating an agent.", true);
+    return;
+  }
+
+  const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+  const data = new FormData(form);
+  const payload = {
+    name: String(data.get("name") ?? ""),
+    description: String(data.get("description") ?? ""),
+    modelProvider: String(data.get("modelProvider") ?? "openai"),
+    model: String(data.get("model") ?? "gpt-4.1-mini"),
+    systemPrompt: String(data.get("systemPrompt") ?? ""),
+    userPromptTemplate: String(data.get("userPromptTemplate") ?? ""),
+    outputPrefix: String(data.get("outputPrefix") ?? "").trim() || undefined
+  };
+
+  submit?.setAttribute("disabled", "true");
+  setStatus("Creating agent...");
+  try {
+    const response = await fetch("/api/agents", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+      setStatus(error?.error ?? "Agent creation failed.", true);
+      return;
+    }
+
+    form.reset();
+    const modelInput = document.querySelector<HTMLInputElement>("#agent-model");
+    if (modelInput) modelInput.value = "gpt-4.1-mini";
+    const providerInput = document.querySelector<HTMLSelectElement>("#agent-provider");
+    if (providerInput) providerInput.value = "openai";
+    setStatus("Agent created.");
+    await load();
+  } catch {
+    setStatus("Agent creation failed.", true);
+  } finally {
+    submit?.removeAttribute("disabled");
+  }
+}
+
 function setStatus(message: string, isError = false): void {
   const statusEl = document.querySelector("#status");
   if (!statusEl) return;
@@ -338,6 +428,11 @@ document.querySelector("#clear-selection")?.addEventListener("click", () => {
     runDetailEl.textContent = "Select a run to inspect logs and artifacts.";
   }
   document.querySelectorAll(".row-button").forEach((row) => row.classList.remove("selected"));
+});
+
+document.querySelector<HTMLFormElement>("#agent-form")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void createAgent(event.currentTarget as HTMLFormElement);
 });
 
 document.querySelector("#save-token")?.addEventListener("click", () => {

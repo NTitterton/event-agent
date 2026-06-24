@@ -88,7 +88,7 @@ Each agent config includes:
 - `createdAt`
 - `updatedAt`
 
-For v1, the deployed stack loads `accounts/default/agents.json`. The runtime also supports looking up a token-derived account key before falling back to `default`, so future scoped API tokens can map to separate S3 config objects.
+For v1, the deployed stack writes runtime-created agents to `accounts/default/agents.json`. The runtime also supports looking up a token-derived account key before falling back to `default`, so future scoped API tokens can map to separate S3 config objects. CDK deploys the starter document under `seed/accounts/default/agents.json` so future deployments do not overwrite the account's runtime-edited config.
 
 ### Runs
 
@@ -135,6 +135,8 @@ Workers should:
 The first UI should show:
 
 - Schedule list.
+- Agent list.
+- Agent creation form for data-driven prompt agents.
 - Run list.
 - Run detail and logs.
 - Manual trigger action.
@@ -147,6 +149,10 @@ Initial API:
 
 - `GET /api/health`
 - `POST /api/events`
+- `GET /api/agents`
+- `GET /api/agents/:id`
+- `POST /api/agents`
+- `POST /api/agents/:id/trigger`
 - `GET /api/schedules`
 - `POST /api/schedules`
 - `PATCH /api/schedules/:id`

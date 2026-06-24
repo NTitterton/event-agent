@@ -62,7 +62,7 @@ graph TD
 
 The system has four main subsystems:
 
-- **Control plane:** authenticated API, schedule CRUD, manual triggers, run inspection, retry/cancel actions, and UI assets.
+- **Control plane:** authenticated API, data-driven agent creation, schedule CRUD, manual triggers, run inspection, retry/cancel actions, and UI assets.
 - **Trigger adapters:** EventBridge Scheduler for cron/rate events, API events for external triggers, internal events from workers/control-plane logic, and future webhook adapters.
 - **Persistence and messaging:** RDS PostgreSQL for queryable state and SQS for durable executable work.
 - **Workers:** stateless ECS/Fargate services that consume queues, lease runs, execute jobs, emit logs, and update status.
@@ -112,7 +112,7 @@ Default AWS stack:
 - **Schedules:** EventBridge Scheduler.
 - **Queues:** SQS standard queues with DLQs.
 - **Secrets:** AWS Secrets Manager or SSM Parameter Store.
-- **Agent config:** private S3 bucket containing `accounts/<account-id>/agents.json`; the dev stack deploys `accounts/default/agents.json`.
+- **Agent config:** private S3 bucket containing `accounts/<account-id>/agents.json`; the dev stack deploys a seed default under `seed/accounts/default/agents.json`.
 - **Logs/metrics:** CloudWatch Logs and CloudWatch metrics.
 
 Aurora Serverless v2 remains a later option for spiky or multi-tenant workloads. EKS remains a later worker-pool backend after the queue/run contract proves stable.
@@ -195,8 +195,9 @@ Runtime startup calls `seedDefaultAgents`, which loads the agent config document
 
 1. `s3://<EVENT_AGENT_CONFIG_BUCKET>/<EVENT_AGENT_CONFIG_PREFIX>/<token-derived-account-id>/agents.json`
 2. `s3://<EVENT_AGENT_CONFIG_BUCKET>/<EVENT_AGENT_CONFIG_PREFIX>/default/agents.json`
-3. `EVENT_AGENT_LOCAL_CONFIG_PATH` when no config bucket is configured
+3. `s3://<EVENT_AGENT_CONFIG_BUCKET>/seed/<EVENT_AGENT_CONFIG_PREFIX>/default/agents.json`
+4. `EVENT_AGENT_LOCAL_CONFIG_PATH` when no config bucket is configured
 
-The dev stack pins `EVENT_AGENT_CONFIG_ACCOUNT_ID=default` for now. A later scoped-token or OIDC model can map each caller/account to its own config object without changing the worker execution contract.
+The dev stack pins `EVENT_AGENT_CONFIG_ACCOUNT_ID=default` for now. The API writes created agents back to `accounts/default/agents.json`, preserving the starter seed as fallback-only config. A later scoped-token or OIDC model can map each caller/account to its own config object without changing the worker execution contract.
 
 Current limitation: the persisted schedule definitions are loaded from S3 into Postgres, but the EventBridge Scheduler resource for the daily stock example is still provisioned by CDK. A future schedule-sync feature should reconcile S3/database schedule definitions into EventBridge Scheduler resources.

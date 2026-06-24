@@ -98,7 +98,7 @@ The intended flow is:
 4. A worker leases the job, resolves prompt-agent inputs, calls the configured model provider, writes artifacts to S3, streams logs, and updates run status.
 5. Failed jobs retry according to policy and eventually move to dead-letter state.
 
-Agents are data, not per-agent TypeScript modules. The daily stock example lives in `config/accounts/default/agents.json`, which the CDK stack deploys into the private config bucket. The document contains prompt text, input resolver config, model provider/model, schedules, and S3 output settings. TypeScript code supplies reusable execution primitives such as SQS polling, input resolution, model-provider adapters, and artifact writing.
+Agents are data, not per-agent TypeScript modules. The daily stock example lives in `config/accounts/default/agents.json`, which the CDK stack deploys into the private config bucket under `seed/accounts/default/agents.json`. Runtime-created agents are written to account config such as `accounts/default/agents.json` through the API/UI. The document contains prompt text, input resolver config, model provider/model, schedules, and S3 output settings. TypeScript code supplies reusable execution primitives such as SQS polling, input resolution, model-provider adapters, and artifact writing.
 
 See [project_spec.md](project_spec.md) and [project_design.md](project_design.md) for the living product and architecture docs.
 

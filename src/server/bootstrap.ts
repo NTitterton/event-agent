@@ -1,4 +1,4 @@
-import { GetObjectCommand, NoSuchKey, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -55,7 +55,7 @@ const agentConfigDocumentSchema = z.object({
   schedules: z.array(scheduleSchema).default([])
 });
 
-type AgentConfigDocument = z.infer<typeof agentConfigDocumentSchema>;
+export type AgentConfigDocument = z.infer<typeof agentConfigDocumentSchema>;
 
 export async function seedDefaultAgents(store: Store, config: AppConfig): Promise<void> {
   const document = await loadAgentConfigDocument(config);
@@ -82,13 +82,31 @@ export async function loadAgentConfigDocument(config: AppConfig): Promise<AgentC
   return parsed;
 }
 
+export async function saveAgentConfigDocument(config: AppConfig, document: AgentConfigDocument): Promise<void> {
+  const parsed = agentConfigDocumentSchema.parse(document);
+  if (!config.agentConfigBucket) return;
+  const client = new S3Client(config.awsRegion ? { region: config.awsRegion } : {});
+  const key = joinS3Key(config.agentConfigPrefix, accountIdFor(config), "agents.json");
+  await client.send(
+    new PutObjectCommand({
+      Bucket: config.agentConfigBucket,
+      Key: key,
+      Body: `${JSON.stringify(parsed, null, 2)}\n`,
+      ContentType: "application/json"
+    })
+  );
+}
+
 async function loadS3AgentConfigDocument(config: AppConfig): Promise<string> {
   if (!config.agentConfigBucket) throw new Error("EVENT_AGENT_CONFIG_BUCKET is not configured");
   const client = new S3Client(config.awsRegion ? { region: config.awsRegion } : {});
-  const accountIds = [accountIdFor(config), "default"];
+  const keys = [
+    joinS3Key(config.agentConfigPrefix, accountIdFor(config), "agents.json"),
+    joinS3Key(config.agentConfigPrefix, "default", "agents.json"),
+    joinS3Key("seed", config.agentConfigPrefix, "default", "agents.json")
+  ].filter((key, index, all) => all.indexOf(key) === index);
   let lastError: unknown;
-  for (const accountId of accountIds) {
-    const key = joinS3Key(config.agentConfigPrefix, accountId, "agents.json");
+  for (const key of keys) {
     try {
       const response = await client.send(new GetObjectCommand({ Bucket: config.agentConfigBucket, Key: key }));
       if (!response.Body) throw new Error(`S3 config object s3://${config.agentConfigBucket}/${key} is empty`);
@@ -99,7 +117,7 @@ async function loadS3AgentConfigDocument(config: AppConfig): Promise<string> {
       throw error;
     }
   }
-  throw new Error(`No agent config found in s3://${config.agentConfigBucket}/${config.agentConfigPrefix}/ for ${accountIds.join(" or ")}: ${String(lastError)}`);
+  throw new Error(`No agent config found in s3://${config.agentConfigBucket}; tried ${keys.join(", ")}: ${String(lastError)}`);
 }
 
 async function loadLocalAgentConfigDocument(config: AppConfig): Promise<string> {

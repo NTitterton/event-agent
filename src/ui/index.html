@@ -40,6 +40,50 @@
 
       <section class="detail-panel">
         <div class="detail-heading">
+          <h2>Create Agent</h2>
+        </div>
+        <form id="agent-form" class="agent-form">
+          <label>
+            <span>Name</span>
+            <input id="agent-name" name="name" type="text" autocomplete="off" required placeholder="Daily market brief" />
+          </label>
+          <label>
+            <span>Provider</span>
+            <select id="agent-provider" name="modelProvider">
+              <option value="openai" selected>OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+              <option value="gemini">Gemini</option>
+              <option value="bedrock">Bedrock</option>
+            </select>
+          </label>
+          <label>
+            <span>Model</span>
+            <input id="agent-model" name="model" type="text" value="gpt-4.1-mini" required />
+          </label>
+          <label>
+            <span>Output prefix</span>
+            <input id="agent-output-prefix" name="outputPrefix" type="text" placeholder="agents/daily-market-brief" />
+          </label>
+          <label class="wide">
+            <span>Description</span>
+            <input id="agent-description" name="description" type="text" placeholder="What this agent does" />
+          </label>
+          <label class="wide">
+            <span>System prompt</span>
+            <textarea id="agent-system-prompt" name="systemPrompt" rows="3" required placeholder="You write concise, factual reports."></textarea>
+          </label>
+          <label class="wide">
+            <span>User prompt template</span>
+            <textarea id="agent-user-prompt" name="userPromptTemplate" rows="5" required placeholder="Today is {{date}}. Write a brief report."></textarea>
+          </label>
+          <div class="form-actions">
+            <button type="submit">Create Agent</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="detail-panel">
+        <div class="detail-heading">
           <h2>Run Detail</h2>
           <button id="clear-selection" class="secondary" type="button">Clear</button>
         </div>

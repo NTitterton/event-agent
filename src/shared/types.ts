@@ -73,7 +73,7 @@ export interface RunJobMessage {
 
 export interface AgentTriggerMessage {
   kind: "agent.trigger";
-  scheduleId: string;
+  scheduleId?: string | undefined;
   agentId: string;
   firedAt: string;
   dedupeKey: string;

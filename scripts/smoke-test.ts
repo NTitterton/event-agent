@@ -38,6 +38,40 @@ test("api smoke flow", async () => {
   assert.equal(agentsResponse.statusCode, 200);
   assert.equal(agentsResponse.json().agents.length, 1);
 
+  const createAgentResponse = await app.inject({
+    method: "POST",
+    url: "/api/agents",
+    headers: auth,
+    payload: {
+      name: "Smoke Prompt Agent",
+      description: "Created by smoke test",
+      modelProvider: "openai",
+      model: "gpt-4.1-mini",
+      systemPrompt: "You are a concise test agent.",
+      userPromptTemplate: "Today is {{date}}. Reply with a smoke test sentence.",
+      outputPrefix: "agents/smoke-prompt-agent"
+    }
+  });
+  assert.equal(createAgentResponse.statusCode, 201);
+  const createdAgent = createAgentResponse.json().agent as { id: string };
+  assert.ok(createdAgent.id);
+
+  const agentsAfterCreateResponse = await app.inject({ method: "GET", url: "/api/agents", headers: auth });
+  assert.equal(agentsAfterCreateResponse.statusCode, 200);
+  assert.equal(agentsAfterCreateResponse.json().agents.length, 2);
+
+  const agentTriggerResponse = await app.inject({
+    method: "POST",
+    url: `/api/agents/${createdAgent.id}/trigger`,
+    headers: auth
+  });
+  assert.equal(agentTriggerResponse.statusCode, 202);
+  const agentTrigger = agentTriggerResponse.json() as { queued: boolean; message: { kind: string; agentId: string; dedupeKey: string } };
+  assert.equal(agentTrigger.queued, true);
+  assert.equal(agentTrigger.message.kind, "agent.trigger");
+  assert.equal(agentTrigger.message.agentId, createdAgent.id);
+  assert.match(agentTrigger.message.dedupeKey, /^manual-agent:agent_smoke_prompt_agent:/);
+
   const seededTriggerResponse = await app.inject({
     method: "POST",
     url: "/api/schedules/sch_stock_report_daily/trigger",

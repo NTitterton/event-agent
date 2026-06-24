@@ -77,7 +77,7 @@ async function processAgentTrigger(
   if (!agent.enabled) throw new Error(`Agent ${message.agentId} is disabled`);
 
   const event = await input.store.createEvent({
-    source: "event-agent.scheduler",
+    source: message.scheduleId ? "event-agent.scheduler" : "event-agent.manual",
     type: "agent.trigger",
     subject: agent.slug,
     payload: { agentId: agent.id, firedAt: message.firedAt },
@@ -85,7 +85,14 @@ async function processAgentTrigger(
   });
   const existingRun = await input.store.getRunByEvent(event.id);
   if (existingRun?.status === "succeeded") return;
-  const run = existingRun ?? (await input.store.createRun({ eventId: event.id, agentId: agent.id, scheduleId: message.scheduleId, queue: "default" }));
+  const run =
+    existingRun ??
+    (await input.store.createRun({
+      eventId: event.id,
+      agentId: agent.id,
+      ...(message.scheduleId ? { scheduleId: message.scheduleId } : {}),
+      queue: "default"
+    }));
 
   await input.store.updateRun(run.id, {
     status: "running",

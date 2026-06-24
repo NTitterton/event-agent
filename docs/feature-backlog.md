@@ -5,10 +5,10 @@ This is the living list of features and platform work we want to consider after 
 ## Near-Term Product Features
 
 - Agent detail view: show prompt, model provider, model, config, output target, schedules, recent runs, logs, and artifacts.
-- Agent editor: create/update data-driven prompt agents without adding TypeScript files.
-- S3 agent config editor/importer: update account-scoped `agents.json` safely from the UI/API.
+- [Partial] Agent editor: create data-driven prompt agents without adding TypeScript files. Update/delete remains pending.
+- [Partial] S3 agent config editor/importer: API-created agents are persisted to account-scoped `agents.json`; full import/diff/rollback remains pending.
 - [Done] Manual schedule trigger: queue an existing schedule from the UI with a `Run now` action.
-- Manual run form: trigger an agent immediately with optional input overrides.
+- [Partial] Manual run form: trigger an agent immediately from the Agents list. Optional input overrides remain pending.
 - [Done] Run detail page: show logs, status transitions, selected inputs, model metadata, and generated artifacts.
 - [Done] Artifact browser: list S3 reports, preview markdown, and download artifacts through authenticated API routes.
 - Schedule editor: create, pause, resume, delete, and manually trigger schedules from the UI.
