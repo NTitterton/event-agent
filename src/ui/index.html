@@ -31,7 +31,10 @@
         </article>
 
         <article>
-          <h2>Schedules</h2>
+          <div class="panel-heading">
+            <h2>Schedules</h2>
+            <button id="toggle-schedule-form" class="secondary compact" type="button" aria-expanded="false" aria-controls="schedule-create-panel">Create</button>
+          </div>
           <div id="schedules" class="list muted">Set `EVENT_AGENT_AUTH_TOKEN` and connect the API.</div>
         </article>
 
@@ -47,6 +50,34 @@
           <button id="clear-selection" class="secondary" type="button">Clear</button>
         </div>
         <div id="run-detail" class="muted">Select a run to inspect logs and artifacts.</div>
+      </section>
+
+      <section id="schedule-create-panel" class="detail-panel collapsible-panel" hidden>
+        <div class="detail-heading">
+          <h2>Create Schedule</h2>
+          <button id="close-schedule-form" class="secondary" type="button">Close</button>
+        </div>
+        <form id="schedule-form" class="schedule-form">
+          <label>
+            <span>Name</span>
+            <input id="schedule-name" name="name" type="text" autocomplete="off" required placeholder="Daily fun fact" />
+          </label>
+          <label>
+            <span>Agent</span>
+            <select id="schedule-agent" name="agentId" required></select>
+          </label>
+          <label>
+            <span>Cron</span>
+            <input id="schedule-expression" name="expression" type="text" value="cron(0 9 * * ? *)" required />
+          </label>
+          <label>
+            <span>Timezone</span>
+            <input id="schedule-timezone" name="timezone" type="text" value="America/Los_Angeles" required />
+          </label>
+          <div class="form-actions">
+            <button type="submit">Create Schedule</button>
+          </div>
+        </form>
       </section>
 
       <section id="agent-create-panel" class="detail-panel collapsible-panel" hidden>

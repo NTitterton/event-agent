@@ -6,11 +6,12 @@ import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { loadConfig, runtimeMode, type AppConfig } from "../shared/config.js";
-import type { AgentDefinition } from "../shared/types.js";
+import type { AgentDefinition, Schedule } from "../shared/types.js";
 import type { AgentTriggerMessage, JobMessage } from "../shared/types.js";
 import { LocalArtifactUrlSigner, S3ArtifactUrlSigner, type ArtifactUrlSigner } from "./artifacts.js";
 import { loadAgentConfigDocument, saveAgentConfigDocument } from "./bootstrap.js";
 import { MemoryQueuePublisher, type QueuePublisher } from "./queue.js";
+import { createScheduleReconciler, type ScheduleReconciler } from "./scheduler.js";
 import { MemoryStore, type Store } from "./store.js";
 
 const eventInputSchema = z.object({
@@ -46,6 +47,7 @@ export interface AppDependencies {
   store?: Store;
   queue?: QueuePublisher;
   artifactUrlSigner?: ArtifactUrlSigner;
+  scheduleReconciler?: ScheduleReconciler;
 }
 
 export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInstance> {
@@ -53,6 +55,7 @@ export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInsta
   const store = deps.store ?? new MemoryStore();
   const queue = deps.queue ?? new MemoryQueuePublisher();
   const artifactUrlSigner = deps.artifactUrlSigner ?? (config.reportsBucket ? new S3ArtifactUrlSigner(config) : new LocalArtifactUrlSigner());
+  const scheduleReconciler = deps.scheduleReconciler ?? createScheduleReconciler(config);
   const app = Fastify({ logger: false });
   const uiDistPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../dist/ui");
 
@@ -139,6 +142,8 @@ export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInsta
     const parsed = scheduleInputSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "Invalid schedule", details: parsed.error.flatten() });
     const schedule = await store.createSchedule(parsed.data);
+    await saveScheduleToConfig(config, schedule);
+    await scheduleReconciler.upsertSchedule(schedule);
     return reply.code(201).send({ schedule });
   });
 
@@ -282,6 +287,23 @@ function uniqueSlug(base: string, existingAgents: AgentDefinition[]): string {
     if (!used.has(candidate)) return candidate;
   }
   return `${base}-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+async function saveScheduleToConfig(config: AppConfig, schedule: Schedule): Promise<void> {
+  const document = await loadAgentConfigDocument(config);
+  if (document.schedules.some((existing) => existing.id === schedule.id)) {
+    throw new Error(`Schedule ${schedule.id} already exists in config`);
+  }
+  document.schedules.push({
+    id: schedule.id,
+    name: schedule.name,
+    expression: schedule.expression,
+    timezone: schedule.timezone,
+    enabled: schedule.enabled,
+    queue: schedule.queue,
+    event: schedule.event
+  });
+  await saveAgentConfigDocument(config, document);
 }
 
 async function sendUiAsset(reply: FastifyReply, uiDistPath: string, assetPath: string) {

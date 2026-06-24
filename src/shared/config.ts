@@ -10,10 +10,13 @@ export interface AppConfig {
   databaseUser?: string | undefined;
   databasePassword?: string | undefined;
   defaultQueueUrl?: string | undefined;
+  defaultQueueArn?: string | undefined;
   reportsBucket?: string | undefined;
   agentConfigBucket?: string | undefined;
   agentConfigPrefix: string;
   agentConfigAccountId?: string | undefined;
+  schedulerGroupName?: string | undefined;
+  schedulerRoleArn?: string | undefined;
   localAgentConfigPath: string;
   openaiApiKey?: string | undefined;
   eventBusName?: string | undefined;
@@ -32,10 +35,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     databaseUser: env.EVENT_AGENT_DATABASE_USER,
     databasePassword: env.EVENT_AGENT_DATABASE_PASSWORD,
     defaultQueueUrl: env.EVENT_AGENT_DEFAULT_QUEUE_URL,
+    defaultQueueArn: env.EVENT_AGENT_DEFAULT_QUEUE_ARN,
     reportsBucket: env.EVENT_AGENT_REPORTS_BUCKET,
     agentConfigBucket: env.EVENT_AGENT_CONFIG_BUCKET,
     agentConfigPrefix: env.EVENT_AGENT_CONFIG_PREFIX ?? "accounts",
     agentConfigAccountId: env.EVENT_AGENT_CONFIG_ACCOUNT_ID,
+    schedulerGroupName: env.EVENT_AGENT_SCHEDULER_GROUP_NAME,
+    schedulerRoleArn: env.EVENT_AGENT_SCHEDULER_ROLE_ARN,
     localAgentConfigPath: env.EVENT_AGENT_LOCAL_CONFIG_PATH ?? "config/accounts/default/agents.json",
     openaiApiKey: env.OPENAI_API_KEY,
     eventBusName: env.EVENT_AGENT_EVENT_BUS_NAME

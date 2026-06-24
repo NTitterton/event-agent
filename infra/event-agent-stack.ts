@@ -116,6 +116,11 @@ export class EventAgentStack extends Stack {
       }
     });
 
+    const schedulerRole = new iam.Role(this, "SchedulerRole", {
+      assumedBy: new iam.ServicePrincipal("scheduler.amazonaws.com")
+    });
+    defaultQueue.grantSendMessages(schedulerRole);
+
     const reportsBucket = new s3.Bucket(this, "ReportsBucket", {
       bucketName: `${name}-reports-${this.account}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -194,10 +199,13 @@ export class EventAgentStack extends Stack {
           EVENT_AGENT_HOST: "0.0.0.0",
           EVENT_AGENT_AWS_REGION: Stack.of(this).region,
           EVENT_AGENT_DEFAULT_QUEUE_URL: defaultQueue.queueUrl,
+          EVENT_AGENT_DEFAULT_QUEUE_ARN: defaultQueue.queueArn,
           EVENT_AGENT_REPORTS_BUCKET: reportsBucket.bucketName,
           EVENT_AGENT_CONFIG_BUCKET: configBucket.bucketName,
           EVENT_AGENT_CONFIG_PREFIX: "accounts",
           EVENT_AGENT_CONFIG_ACCOUNT_ID: "default",
+          EVENT_AGENT_SCHEDULER_GROUP_NAME: name,
+          EVENT_AGENT_SCHEDULER_ROLE_ARN: schedulerRole.roleArn,
           ...databaseEnvironment
         },
         secrets: {
@@ -263,6 +271,23 @@ export class EventAgentStack extends Stack {
 
     defaultQueue.grantConsumeMessages(workerTask.taskRole);
     defaultQueue.grantSendMessages(apiService.taskDefinition.taskRole);
+    apiService.taskDefinition.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ["scheduler:CreateSchedule", "scheduler:UpdateSchedule", "scheduler:GetSchedule"],
+        resources: [`arn:${Stack.of(this).partition}:scheduler:${Stack.of(this).region}:${Stack.of(this).account}:schedule/${name}/*`]
+      })
+    );
+    apiService.taskDefinition.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ["iam:PassRole"],
+        resources: [schedulerRole.roleArn],
+        conditions: {
+          StringEquals: {
+            "iam:PassedToService": "scheduler.amazonaws.com"
+          }
+        }
+      })
+    );
     reportsBucket.grantRead(apiService.taskDefinition.taskRole);
     reportsBucket.grantWrite(workerTask.taskRole);
     configBucket.grantReadWrite(apiService.taskDefinition.taskRole);
@@ -273,11 +298,6 @@ export class EventAgentStack extends Stack {
     authToken.grantRead(workerTask.taskRole);
     openAiApiKey.grantRead(apiService.taskDefinition.taskRole);
     openAiApiKey.grantRead(workerTask.taskRole);
-
-    const schedulerRole = new iam.Role(this, "SchedulerRole", {
-      assumedBy: new iam.ServicePrincipal("scheduler.amazonaws.com")
-    });
-    defaultQueue.grantSendMessages(schedulerRole);
 
     const scheduleGroup = new scheduler.CfnScheduleGroup(this, "ScheduleGroup", {
       name

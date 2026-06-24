@@ -10,7 +10,7 @@ Unlike OpenClaw/Hermes-like continuously running personal assistants, Event Agen
 
 - No required local Docker Postgres or laptop-hosted durable runtime.
 - No full multi-user account system; v1 uses a single bearer token.
-- No fully dynamic EventBridge Scheduler synchronization from S3 config yet; the first daily schedule resource is still created by CDK.
+- No full schedule reconciliation loop yet; v1 can create new EventBridge schedules through the API, but it does not continuously diff every S3 config schedule against AWS.
 - No Kubernetes requirement in v1; EKS remains a future worker backend.
 - No provider-specific webhook verification in the first engine milestone unless it is needed for an early workflow.
 - No guarantee of exactly-once execution; v1 targets at-least-once execution with idempotency keys.
@@ -137,6 +137,7 @@ The first UI should show:
 - Schedule list.
 - Agent list.
 - Agent creation form for data-driven prompt agents.
+- Schedule creation form for agent cron schedules.
 - Run list.
 - Run detail and logs.
 - Manual trigger action.

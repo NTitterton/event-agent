@@ -1,6 +1,7 @@
 const tokenInput = document.querySelector<HTMLInputElement>("#token");
 let loadSequence = 0;
 let selectedRunId: string | undefined;
+let latestAgents: AgentSummary[] = [];
 
 if (tokenInput) {
   tokenInput.value = window.localStorage.getItem("event-agent-token") ?? "";
@@ -93,6 +94,8 @@ async function load(): Promise<void> {
   const agentsJson = (await agentsResponse.json()) as { agents: AgentSummary[] };
   const schedulesJson = (await schedulesResponse.json()) as { schedules: ScheduleSummary[] };
   const runsJson = (await runsResponse.json()) as { runs: RunSummary[] };
+  latestAgents = agentsJson.agents;
+  renderScheduleAgentOptions();
 
   agentsEl.innerHTML = agentsJson.agents.length
     ? agentsJson.agents
@@ -288,9 +291,7 @@ async function triggerSchedule(scheduleId: string | undefined, button: HTMLButto
     if (json.run?.id) selectedRunId = json.run.id;
     setStatus("Schedule run queued.");
     await load();
-    window.setTimeout(() => {
-      void load();
-    }, 1800);
+    scheduleRefreshes();
   } catch {
     setStatus("Schedule trigger failed.", true);
   } finally {
@@ -320,9 +321,7 @@ async function triggerAgent(agentId: string | undefined, button: HTMLButtonEleme
 
     setStatus("Agent run queued.");
     await load();
-    window.setTimeout(() => {
-      void load();
-    }, 1800);
+    scheduleRefreshes();
   } catch {
     setStatus("Agent trigger failed.", true);
   } finally {
@@ -381,12 +380,79 @@ async function createAgent(form: HTMLFormElement): Promise<void> {
   }
 }
 
+async function createSchedule(form: HTMLFormElement): Promise<void> {
+  const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "";
+  if (!token) {
+    setStatus("Enter the API token before creating a schedule.", true);
+    return;
+  }
+
+  const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+  const data = new FormData(form);
+  const agentId = String(data.get("agentId") ?? "");
+  const agent = latestAgents.find((candidate) => candidate.id === agentId);
+  const name = String(data.get("name") ?? "");
+  const payload = {
+    name,
+    expression: String(data.get("expression") ?? ""),
+    timezone: String(data.get("timezone") ?? "UTC"),
+    enabled: true,
+    queue: "default",
+    event: {
+      source: "event-agent.scheduler",
+      type: "agent.trigger",
+      subject: agent?.name ? slugify(agent.name) : slugify(name),
+      payload: { agentId }
+    }
+  };
+
+  submit?.setAttribute("disabled", "true");
+  setStatus("Creating schedule...");
+  try {
+    const response = await fetch("/api/schedules", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+      setStatus(error?.error ?? "Schedule creation failed.", true);
+      return;
+    }
+
+    form.reset();
+    const expressionInput = document.querySelector<HTMLInputElement>("#schedule-expression");
+    if (expressionInput) expressionInput.value = "cron(0 9 * * ? *)";
+    const timezoneInput = document.querySelector<HTMLInputElement>("#schedule-timezone");
+    if (timezoneInput) timezoneInput.value = "America/Los_Angeles";
+    renderScheduleAgentOptions();
+    setScheduleFormOpen(false);
+    setStatus("Schedule created.");
+    await load();
+  } catch {
+    setStatus("Schedule creation failed.", true);
+  } finally {
+    submit?.removeAttribute("disabled");
+  }
+}
+
 function setStatus(message: string, isError = false): void {
   const statusEl = document.querySelector("#status");
   if (!statusEl) return;
   statusEl.textContent = message;
   statusEl.classList.toggle("error-text", isError);
   statusEl.classList.toggle("muted", !isError);
+}
+
+function scheduleRefreshes(): void {
+  for (const delay of [1500, 4000, 8000]) {
+    window.setTimeout(() => {
+      void load();
+    }, delay);
+  }
 }
 
 function renderLogs(logs: RunLog[]): string {
@@ -417,6 +483,26 @@ function escapeHtml(value: string): string {
   });
 }
 
+function renderScheduleAgentOptions(): void {
+  const select = document.querySelector<HTMLSelectElement>("#schedule-agent");
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = latestAgents
+    .map((agent) => `<option value="${escapeHtml(agent.id)}">${escapeHtml(agent.name)}</option>`)
+    .join("");
+  if (latestAgents.some((agent) => agent.id === current)) select.value = current;
+}
+
+function slugify(value: string): string {
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "schedule"
+  );
+}
+
 document.querySelector("#refresh")?.addEventListener("click", () => {
   void load();
 });
@@ -436,6 +522,11 @@ document.querySelector<HTMLFormElement>("#agent-form")?.addEventListener("submit
   void createAgent(event.currentTarget as HTMLFormElement);
 });
 
+document.querySelector<HTMLFormElement>("#schedule-form")?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  void createSchedule(event.currentTarget as HTMLFormElement);
+});
+
 function setAgentFormOpen(open: boolean): void {
   const panel = document.querySelector<HTMLElement>("#agent-create-panel");
   const toggle = document.querySelector<HTMLButtonElement>("#toggle-agent-form");
@@ -448,6 +539,19 @@ function setAgentFormOpen(open: boolean): void {
   }
 }
 
+function setScheduleFormOpen(open: boolean): void {
+  const panel = document.querySelector<HTMLElement>("#schedule-create-panel");
+  const toggle = document.querySelector<HTMLButtonElement>("#toggle-schedule-form");
+  if (!panel || !toggle) return;
+  panel.hidden = !open;
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.textContent = open ? "Hide" : "Create";
+  renderScheduleAgentOptions();
+  if (open) {
+    document.querySelector<HTMLInputElement>("#schedule-name")?.focus();
+  }
+}
+
 document.querySelector("#toggle-agent-form")?.addEventListener("click", () => {
   const panel = document.querySelector<HTMLElement>("#agent-create-panel");
   setAgentFormOpen(Boolean(panel?.hidden));
@@ -455,6 +559,15 @@ document.querySelector("#toggle-agent-form")?.addEventListener("click", () => {
 
 document.querySelector("#close-agent-form")?.addEventListener("click", () => {
   setAgentFormOpen(false);
+});
+
+document.querySelector("#toggle-schedule-form")?.addEventListener("click", () => {
+  const panel = document.querySelector<HTMLElement>("#schedule-create-panel");
+  setScheduleFormOpen(Boolean(panel?.hidden));
+});
+
+document.querySelector("#close-schedule-form")?.addEventListener("click", () => {
+  setScheduleFormOpen(false);
 });
 
 document.querySelector("#save-token")?.addEventListener("click", () => {

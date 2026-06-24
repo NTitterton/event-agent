@@ -11,7 +11,7 @@ This is the living list of features and platform work we want to consider after 
 - [Partial] Manual run form: trigger an agent immediately from the Agents list. Optional input overrides remain pending.
 - [Done] Run detail page: show logs, status transitions, selected inputs, model metadata, and generated artifacts.
 - [Done] Artifact browser: list S3 reports, preview markdown, and download artifacts through authenticated API routes.
-- Schedule editor: create, pause, resume, delete, and manually trigger schedules from the UI.
+- [Partial] Schedule editor: create agent schedules and manually trigger schedules from the UI. Pause/resume/delete/edit remain pending.
 - [Done] Report links: show the generated `s3://...` key and optionally a short-lived presigned download URL.
 
 ## Agent And Model Runtime
@@ -55,7 +55,7 @@ This is the living list of features and platform work we want to consider after 
 - Separate `dev` and `prod` stacks with explicit naming and deployment commands.
 - GitHub Actions CI for typecheck/tests/synth and optional manual deploy.
 - CDK context/config for environment-specific sizing, schedules, and feature flags.
-- Schedule reconciliation: sync account-scoped schedule config into EventBridge Scheduler instead of hardcoding the example schedule in CDK.
+- [Partial] Schedule reconciliation: API-created agent schedules are created in EventBridge Scheduler. Full S3/database-to-EventBridge diffing remains pending.
 - API Gateway alternative evaluation for lower fixed cost than ALB.
 - ECS service autoscaling based on SQS queue depth.
 - Per-run ECS tasks for stronger isolation when agents need heavier tools or risky operations.
