@@ -6,6 +6,7 @@ This is the living list of features and platform work we want to consider after 
 
 - Agent detail view: show prompt, model provider, model, config, output target, schedules, recent runs, logs, and artifacts.
 - Agent editor: create/update data-driven prompt agents without adding TypeScript files.
+- S3 agent config editor/importer: update account-scoped `agents.json` safely from the UI/API.
 - [Done] Manual schedule trigger: queue an existing schedule from the UI with a `Run now` action.
 - Manual run form: trigger an agent immediately with optional input overrides.
 - [Done] Run detail page: show logs, status transitions, selected inputs, model metadata, and generated artifacts.
@@ -17,8 +18,10 @@ This is the living list of features and platform work we want to consider after 
 
 - Provider adapters: add Anthropic, Gemini, and AWS Bedrock behind the existing model-provider interface.
 - AWS-local model option: evaluate running local/open-weight models on AWS only when we have a workflow that justifies GPU or managed inference cost.
-- Provider configuration: store provider/model/temperature/max tokens per agent, with defaults and secret references.
+- [Done] Provider configuration source: store provider/model, prompt text, resolver config, schedules, and output settings in account-scoped S3 config instead of TypeScript files.
+- Provider runtime options: support temperature/max tokens/defaults and secret references per agent.
 - Input resolvers: add reusable resolvers for HTTP fetches, static lists, date/time, S3 objects, prior artifacts, and API-trigger payload fields.
+- [Done] Static-list input resolver: move stock universe data into agent config and select entries with `static.random`.
 - Tool permissions: define which tools/resolvers each agent may use.
 - Prompt versioning: keep previous prompt/config versions and link each run to the exact version used.
 - Multi-artifact output: allow agents to emit markdown, JSON, images, CSV, or arbitrary files.
@@ -52,6 +55,7 @@ This is the living list of features and platform work we want to consider after 
 - Separate `dev` and `prod` stacks with explicit naming and deployment commands.
 - GitHub Actions CI for typecheck/tests/synth and optional manual deploy.
 - CDK context/config for environment-specific sizing, schedules, and feature flags.
+- Schedule reconciliation: sync account-scoped schedule config into EventBridge Scheduler instead of hardcoding the example schedule in CDK.
 - API Gateway alternative evaluation for lower fixed cost than ALB.
 - ECS service autoscaling based on SQS queue depth.
 - Per-run ECS tasks for stronger isolation when agents need heavier tools or risky operations.
@@ -69,7 +73,7 @@ This is the living list of features and platform work we want to consider after 
 
 ## Current Example Agents
 
-- Daily stock report: data-driven prompt agent that picks a random stock from a static S&P 500 subset and writes a markdown report to S3.
+- Daily stock report: S3-configured prompt agent that picks a random stock from a static list in `accounts/default/agents.json` and writes a markdown report to S3.
 
 ## Candidate Future Agents
 

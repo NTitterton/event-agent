@@ -1,6 +1,5 @@
 import type { ArtifactWriter } from "./artifact-writer.js";
 import type { ModelProvider } from "./model-provider.js";
-import { pickRandomStock } from "./stock-universe.js";
 import type { AgentDefinition, RunArtifact } from "../shared/types.js";
 
 export interface PromptAgentResult {
@@ -52,10 +51,17 @@ function resolveInputs(agent: AgentDefinition, now: Date, random?: () => number)
   const inputs = recordConfig(agent.config.inputs);
   for (const [name, value] of Object.entries(inputs)) {
     const resolver = stringConfig(value, "resolver");
-    if (resolver === "sp500.random") context[name] = pickRandomStock(random);
+    if (resolver === "static.random") context[name] = pickRandomItem(value, random);
     if (resolver === "date.iso") context[name] = now.toISOString().slice(0, 10);
   }
   return context;
+}
+
+function pickRandomItem(value: unknown, random: () => number = Math.random): unknown {
+  const items = arrayConfig(value, "items");
+  if (!items.length) throw new Error("static.random resolver requires at least one item");
+  const index = Math.floor(random() * items.length);
+  return items[Math.min(index, items.length - 1)] ?? items[0];
 }
 
 function renderTemplate(template: string, values: Record<string, unknown>): string {
@@ -80,6 +86,11 @@ function joinS3Key(prefix: string, key: string): string {
 
 function recordConfig(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function arrayConfig(value: unknown, key: string): unknown[] {
+  const record = recordConfig(value);
+  return Array.isArray(record[key]) ? record[key] : [];
 }
 
 function stringConfig(value: unknown, key: string): string | undefined {

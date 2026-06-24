@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "account": {
+    "id": "default",
+    "name": "Default account"
+  },
+  "agents": [
+    {
+      "id": "agent_stock_report_daily",
+      "slug": "daily-stock-report",
+      "name": "Daily Stock Report",
+      "description": "Picks one random S&P 500 stock daily and writes a concise markdown report.",
+      "enabled": true,
+      "kind": "prompt",
+      "modelProvider": "openai",
+      "model": "gpt-4.1-mini",
+      "systemPrompt": "You are a concise stock research agent. Write practical, readable markdown. This is an example workflow, not financial advice.",
+      "userPromptTemplate": "Today is {{date}}. Write a concise stock research report for {{stock.ticker}} ({{stock.name}}). Include a thesis, risks, key catalysts, and a buy/hold/sell view. Keep it under 900 words.",
+      "config": {
+        "inputs": {
+          "stock": {
+            "resolver": "static.random",
+            "items": [
+              { "ticker": "AAPL", "name": "Apple" },
+              { "ticker": "MSFT", "name": "Microsoft" },
+              { "ticker": "AMZN", "name": "Amazon" },
+              { "ticker": "NVDA", "name": "Nvidia" },
+              { "ticker": "GOOGL", "name": "Alphabet" },
+              { "ticker": "META", "name": "Meta Platforms" },
+              { "ticker": "BRK.B", "name": "Berkshire Hathaway" },
+              { "ticker": "LLY", "name": "Eli Lilly" },
+              { "ticker": "AVGO", "name": "Broadcom" },
+              { "ticker": "JPM", "name": "JPMorgan Chase" },
+              { "ticker": "TSLA", "name": "Tesla" },
+              { "ticker": "XOM", "name": "Exxon Mobil" },
+              { "ticker": "UNH", "name": "UnitedHealth Group" },
+              { "ticker": "V", "name": "Visa" },
+              { "ticker": "MA", "name": "Mastercard" },
+              { "ticker": "PG", "name": "Procter & Gamble" },
+              { "ticker": "COST", "name": "Costco Wholesale" },
+              { "ticker": "HD", "name": "Home Depot" },
+              { "ticker": "JNJ", "name": "Johnson & Johnson" },
+              { "ticker": "ABBV", "name": "AbbVie" },
+              { "ticker": "MRK", "name": "Merck" },
+              { "ticker": "BAC", "name": "Bank of America" },
+              { "ticker": "KO", "name": "Coca-Cola" },
+              { "ticker": "PEP", "name": "PepsiCo" },
+              { "ticker": "CRM", "name": "Salesforce" },
+              { "ticker": "NFLX", "name": "Netflix" },
+              { "ticker": "WMT", "name": "Walmart" },
+              { "ticker": "AMD", "name": "Advanced Micro Devices" },
+              { "ticker": "ADBE", "name": "Adobe" },
+              { "ticker": "CSCO", "name": "Cisco Systems" },
+              { "ticker": "ORCL", "name": "Oracle" },
+              { "ticker": "MCD", "name": "McDonald's" },
+              { "ticker": "DIS", "name": "Walt Disney" },
+              { "ticker": "INTC", "name": "Intel" },
+              { "ticker": "TMO", "name": "Thermo Fisher Scientific" },
+              { "ticker": "ACN", "name": "Accenture" },
+              { "ticker": "ABT", "name": "Abbott Laboratories" },
+              { "ticker": "LIN", "name": "Linde" },
+              { "ticker": "DHR", "name": "Danaher" },
+              { "ticker": "VZ", "name": "Verizon" },
+              { "ticker": "CMCSA", "name": "Comcast" },
+              { "ticker": "TXN", "name": "Texas Instruments" },
+              { "ticker": "NEE", "name": "NextEra Energy" },
+              { "ticker": "PM", "name": "Philip Morris International" },
+              { "ticker": "IBM", "name": "IBM" },
+              { "ticker": "GE", "name": "GE Aerospace" },
+              { "ticker": "QCOM", "name": "Qualcomm" },
+              { "ticker": "NOW", "name": "ServiceNow" },
+              { "ticker": "CAT", "name": "Caterpillar" },
+              { "ticker": "HON", "name": "Honeywell" }
+            ]
+          },
+          "date": {
+            "resolver": "date.iso"
+          }
+        },
+        "report": {
+          "type": "markdown-report",
+          "tickerPath": "stock.ticker",
+          "titleTemplate": "{{date}} {{stock.ticker}} stock report"
+        }
+      },
+      "output": {
+        "storage": "s3",
+        "bucket": "{{reportsBucket}}",
+        "prefix": "stock-reports",
+        "filenameTemplate": "reports/{{date}}-{{stock.ticker}}.md"
+      },
+      "createdAt": "2026-06-23T00:00:00.000Z",
+      "updatedAt": "2026-06-23T00:00:00.000Z"
+    }
+  ],
+  "schedules": [
+    {
+      "id": "sch_stock_report_daily",
+      "name": "Daily stock report",
+      "expression": "cron(0 9 * * ? *)",
+      "timezone": "America/Los_Angeles",
+      "enabled": true,
+      "queue": "default",
+      "event": {
+        "source": "event-agent.scheduler",
+        "type": "agent.trigger",
+        "subject": "stock-report-daily",
+        "payload": {
+          "agentId": "agent_stock_report_daily"
+        }
+      }
+    }
+  ]
+}

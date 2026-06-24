@@ -11,11 +11,11 @@ export interface AppConfig {
   databasePassword?: string | undefined;
   defaultQueueUrl?: string | undefined;
   reportsBucket?: string | undefined;
+  agentConfigBucket?: string | undefined;
+  agentConfigPrefix: string;
+  agentConfigAccountId?: string | undefined;
+  localAgentConfigPath: string;
   openaiApiKey?: string | undefined;
-  stockAgentId: string;
-  stockAgentScheduleId: string;
-  stockAgentScheduleExpression: string;
-  stockAgentScheduleTimezone: string;
   eventBusName?: string | undefined;
 }
 
@@ -33,11 +33,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     databasePassword: env.EVENT_AGENT_DATABASE_PASSWORD,
     defaultQueueUrl: env.EVENT_AGENT_DEFAULT_QUEUE_URL,
     reportsBucket: env.EVENT_AGENT_REPORTS_BUCKET,
+    agentConfigBucket: env.EVENT_AGENT_CONFIG_BUCKET,
+    agentConfigPrefix: env.EVENT_AGENT_CONFIG_PREFIX ?? "accounts",
+    agentConfigAccountId: env.EVENT_AGENT_CONFIG_ACCOUNT_ID,
+    localAgentConfigPath: env.EVENT_AGENT_LOCAL_CONFIG_PATH ?? "config/accounts/default/agents.json",
     openaiApiKey: env.OPENAI_API_KEY,
-    stockAgentId: env.EVENT_AGENT_STOCK_AGENT_ID ?? "agent_stock_report_daily",
-    stockAgentScheduleId: env.EVENT_AGENT_STOCK_AGENT_SCHEDULE_ID ?? "sch_stock_report_daily",
-    stockAgentScheduleExpression: env.EVENT_AGENT_STOCK_AGENT_SCHEDULE_EXPRESSION ?? "cron(0 9 * * ? *)",
-    stockAgentScheduleTimezone: env.EVENT_AGENT_STOCK_AGENT_SCHEDULE_TIMEZONE ?? "America/Los_Angeles",
     eventBusName: env.EVENT_AGENT_EVENT_BUS_NAME
   };
 }

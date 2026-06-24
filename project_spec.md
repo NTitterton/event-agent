@@ -10,6 +10,7 @@ Unlike OpenClaw/Hermes-like continuously running personal assistants, Event Agen
 
 - No required local Docker Postgres or laptop-hosted durable runtime.
 - No full multi-user account system; v1 uses a single bearer token.
+- No fully dynamic EventBridge Scheduler synchronization from S3 config yet; the first daily schedule resource is still created by CDK.
 - No Kubernetes requirement in v1; EKS remains a future worker backend.
 - No provider-specific webhook verification in the first engine milestone unless it is needed for an early workflow.
 - No guarantee of exactly-once execution; v1 targets at-least-once execution with idempotency keys.
@@ -23,6 +24,7 @@ Unlike OpenClaw/Hermes-like continuously running personal assistants, Event Agen
 - Executable work should move through SQS queues with dead-letter queues.
 - Workers should run as ECS/Fargate services.
 - Secrets should live in AWS Secrets Manager or SSM Parameter Store in hosted environments.
+- Agent definitions, prompt text, model provider/model selection, resolver config, output targets, and default schedule definitions should live in account-scoped JSON config in S3, with a local file fallback for development/tests.
 - Local development may run API/worker processes for iteration, but local state is not authoritative.
 
 ### Trigger Types
@@ -59,6 +61,34 @@ Schedules should support:
 - `updatedAt`
 
 The first implementation may store and trigger schedules through an in-memory adapter for smoke tests, but the production design is RDS plus EventBridge Scheduler.
+
+### Agent Config
+
+Prompt agents are configuration, not per-agent TypeScript files. The initial config source is a versioned S3 JSON document:
+
+- `version`
+- `account.id`
+- `agents[]`
+- `schedules[]`
+
+Each agent config includes:
+
+- `id`
+- `slug`
+- `name`
+- `description`
+- `enabled`
+- `kind`
+- `modelProvider`
+- `model`
+- `systemPrompt`
+- `userPromptTemplate`
+- `config`
+- `output`
+- `createdAt`
+- `updatedAt`
+
+For v1, the deployed stack loads `accounts/default/agents.json`. The runtime also supports looking up a token-derived account key before falling back to `default`, so future scoped API tokens can map to separate S3 config objects.
 
 ### Runs
 
@@ -134,6 +164,7 @@ All non-health API routes require `Authorization: Bearer <EVENT_AGENT_AUTH_TOKEN
 - Repo contains durable documentation, setup instructions, and verification scripts.
 - `npm run check` type-checks the TypeScript code.
 - `npm run smoke` verifies health, auth, schedule creation, manual triggering, and run listing without touching AWS.
+- The default prompt agent and its stock universe are loaded from `config/accounts/default/agents.json`, not from stock-specific TypeScript modules.
 - The docs clearly state that cloud runtime is required for durable operation.
 - The architecture cleanly separates control-plane APIs, trigger adapters, queue adapters, worker execution, and persistence.
 
@@ -143,4 +174,3 @@ All non-health API routes require `Authorization: Bearer <EVENT_AGENT_AUTH_TOKEN
 - Should hosted API/UI live behind an Application Load Balancer, API Gateway, or another ingress?
 - Should the first infrastructure implementation use Terraform, AWS CDK, Pulumi, or documented manual setup?
 - How much sandboxing should be inside the worker process versus delegated to per-run ECS tasks?
-

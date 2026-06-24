@@ -10,6 +10,7 @@ import * as rds from "aws-cdk-lib/aws-rds";
 import * as scheduler from "aws-cdk-lib/aws-scheduler";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 
@@ -133,6 +134,20 @@ export class EventAgentStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN
     });
 
+    const configBucket = new s3.Bucket(this, "ConfigBucket", {
+      bucketName: `${name}-config-${this.account}`,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      versioned: true,
+      removalPolicy: RemovalPolicy.RETAIN
+    });
+
+    const defaultAgentConfigDeployment = new s3deploy.BucketDeployment(this, "DefaultAgentConfigDeployment", {
+      sources: [s3deploy.Source.asset("config")],
+      destinationBucket: configBucket
+    });
+
     const cluster = new ecs.Cluster(this, "Cluster", {
       vpc,
       clusterName: name,
@@ -178,6 +193,9 @@ export class EventAgentStack extends Stack {
           EVENT_AGENT_AWS_REGION: Stack.of(this).region,
           EVENT_AGENT_DEFAULT_QUEUE_URL: defaultQueue.queueUrl,
           EVENT_AGENT_REPORTS_BUCKET: reportsBucket.bucketName,
+          EVENT_AGENT_CONFIG_BUCKET: configBucket.bucketName,
+          EVENT_AGENT_CONFIG_PREFIX: "accounts",
+          EVENT_AGENT_CONFIG_ACCOUNT_ID: "default",
           ...databaseEnvironment
         },
         secrets: {
@@ -213,6 +231,9 @@ export class EventAgentStack extends Stack {
         EVENT_AGENT_AWS_REGION: Stack.of(this).region,
         EVENT_AGENT_DEFAULT_QUEUE_URL: defaultQueue.queueUrl,
         EVENT_AGENT_REPORTS_BUCKET: reportsBucket.bucketName,
+        EVENT_AGENT_CONFIG_BUCKET: configBucket.bucketName,
+        EVENT_AGENT_CONFIG_PREFIX: "accounts",
+        EVENT_AGENT_CONFIG_ACCOUNT_ID: "default",
         ...databaseEnvironment
       },
       secrets: {
@@ -242,6 +263,8 @@ export class EventAgentStack extends Stack {
     defaultQueue.grantSendMessages(apiService.taskDefinition.taskRole);
     reportsBucket.grantRead(apiService.taskDefinition.taskRole);
     reportsBucket.grantWrite(workerTask.taskRole);
+    configBucket.grantRead(apiService.taskDefinition.taskRole);
+    configBucket.grantRead(workerTask.taskRole);
     database.secret?.grantRead(apiService.taskDefinition.taskRole);
     database.secret?.grantRead(workerTask.taskRole);
     authToken.grantRead(apiService.taskDefinition.taskRole);
@@ -291,6 +314,9 @@ export class EventAgentStack extends Stack {
     new cdk.CfnOutput(this, "ReportsBucketName", {
       value: reportsBucket.bucketName
     });
+    new cdk.CfnOutput(this, "ConfigBucketName", {
+      value: configBucket.bucketName
+    });
     new cdk.CfnOutput(this, "DatabaseEndpoint", {
       value: database.dbInstanceEndpointAddress
     });
@@ -303,5 +329,7 @@ export class EventAgentStack extends Stack {
 
     workerService.node.addDependency(database);
     apiService.node.addDependency(database);
+    workerService.node.addDependency(defaultAgentConfigDeployment);
+    apiService.node.addDependency(defaultAgentConfigDeployment);
   }
 }

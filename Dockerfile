@@ -15,6 +15,7 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
+COPY config ./config
 COPY src ./src
 COPY tsconfig.json ./
 EXPOSE 5180

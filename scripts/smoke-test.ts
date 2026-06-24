@@ -11,20 +11,16 @@ test("api smoke flow", async () => {
     host: "127.0.0.1",
     port: 0,
     reportsBucket: "test-bucket",
-    stockAgentId: "agent_stock_report_daily",
-    stockAgentScheduleId: "sch_stock_report_daily",
-    stockAgentScheduleExpression: "cron(0 9 * * ? *)",
-    stockAgentScheduleTimezone: "America/Los_Angeles"
+    agentConfigPrefix: "accounts",
+    localAgentConfigPath: "config/accounts/default/agents.json"
   });
   const app = await buildApp({
     config: {
       authToken: "test-token",
       host: "127.0.0.1",
       port: 0,
-      stockAgentId: "agent_stock_report_daily",
-      stockAgentScheduleId: "sch_stock_report_daily",
-      stockAgentScheduleExpression: "cron(0 9 * * ? *)",
-      stockAgentScheduleTimezone: "America/Los_Angeles"
+      agentConfigPrefix: "accounts",
+      localAgentConfigPath: "config/accounts/default/agents.json"
     },
     store
   });

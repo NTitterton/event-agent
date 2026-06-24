@@ -26,6 +26,7 @@ graph TD
         SQS["SQS Work Queues<br/>default/capability-specific"]
         DLQ["Dead-Letter Queues"]
         S3["S3 Report Artifacts"]
+        ConfigS3["S3 Agent Config<br/>accounts/*/agents.json"]
         Secrets["Secrets Manager / SSM"]
     end
 
@@ -49,6 +50,8 @@ graph TD
     SQS --> Fargate
     SQS --> DLQ
     Fargate --> Executor
+    Fargate --> ConfigS3
+    API --> ConfigS3
     Executor --> Logs
     Executor --> DB
     Executor --> S3
@@ -63,7 +66,7 @@ The system has four main subsystems:
 - **Trigger adapters:** EventBridge Scheduler for cron/rate events, API events for external triggers, internal events from workers/control-plane logic, and future webhook adapters.
 - **Persistence and messaging:** RDS PostgreSQL for queryable state and SQS for durable executable work.
 - **Workers:** stateless ECS/Fargate services that consume queues, lease runs, execute jobs, emit logs, and update status.
-- **Agents:** data-driven prompt definitions stored in Postgres. A prompt agent contains prompt text, input resolver config, model provider/model, and output settings. Adding an agent should not require adding an agent-specific TypeScript file.
+- **Agents:** data-driven prompt definitions loaded from account-scoped S3 JSON config and upserted into Postgres for query/runtime state. A prompt agent contains prompt text, input resolver config, model provider/model, and output settings. Adding an agent should not require adding an agent-specific TypeScript file.
 
 The first implementation keeps the adapter interfaces small so local smoke tests can run with in-memory adapters while hosted runtime uses AWS-backed adapters.
 
@@ -109,6 +112,7 @@ Default AWS stack:
 - **Schedules:** EventBridge Scheduler.
 - **Queues:** SQS standard queues with DLQs.
 - **Secrets:** AWS Secrets Manager or SSM Parameter Store.
+- **Agent config:** private S3 bucket containing `accounts/<account-id>/agents.json`; the dev stack deploys `accounts/default/agents.json`.
 - **Logs/metrics:** CloudWatch Logs and CloudWatch metrics.
 
 Aurora Serverless v2 remains a later option for spiky or multi-tenant workloads. EKS remains a later worker-pool backend after the queue/run contract proves stable.
@@ -177,9 +181,22 @@ Initial repo layout:
 - `src/server`: API/control-plane app.
 - `src/worker`: queue worker entrypoint and execution loop.
 - `src/agents`: reusable prompt execution primitives, provider adapters, artifact writers, and shared input resolvers.
+- `config`: versioned account-scoped agent/schedule config documents deployed to S3.
 - `src/ui`: minimal browser UI shell.
 - `src/infra`: cloud architecture notes.
 - `infra`: AWS CDK app that synthesizes CloudFormation for the initial cloud runtime.
 - `scripts`: smoke and helper scripts.
 
-The first hosted prompt-agent checkpoint uses Postgres for state, SQS for work, S3 for markdown report artifacts, and a direct model-provider adapter. The seeded daily stock agent is data in the store; TypeScript remains generic platform code.
+The first hosted prompt-agent checkpoint uses Postgres for state, SQS for work, S3 for markdown report artifacts, S3 for account-scoped agent config, and a direct model-provider adapter. The daily stock agent, its prompt, model settings, output settings, schedule definition, and static stock input list live in `config/accounts/default/agents.json`; TypeScript remains generic platform code.
+
+## 8. Agent Config Source
+
+Runtime startup calls `seedDefaultAgents`, which loads the agent config document from:
+
+1. `s3://<EVENT_AGENT_CONFIG_BUCKET>/<EVENT_AGENT_CONFIG_PREFIX>/<token-derived-account-id>/agents.json`
+2. `s3://<EVENT_AGENT_CONFIG_BUCKET>/<EVENT_AGENT_CONFIG_PREFIX>/default/agents.json`
+3. `EVENT_AGENT_LOCAL_CONFIG_PATH` when no config bucket is configured
+
+The dev stack pins `EVENT_AGENT_CONFIG_ACCOUNT_ID=default` for now. A later scoped-token or OIDC model can map each caller/account to its own config object without changing the worker execution contract.
+
+Current limitation: the persisted schedule definitions are loaded from S3 into Postgres, but the EventBridge Scheduler resource for the daily stock example is still provisioned by CDK. A future schedule-sync feature should reconcile S3/database schedule definitions into EventBridge Scheduler resources.

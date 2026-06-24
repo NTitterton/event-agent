@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { LocalArtifactWriter } from "../src/agents/artifact-writer.js";
-import { buildDailyStockPromptAgent } from "../src/agents/prompt-agent.js";
 import { executePromptAgent } from "../src/agents/prompt-executor.js";
 import { StaticModelProvider } from "../src/agents/model-provider.js";
+import { seedDefaultAgents } from "../src/server/bootstrap.js";
 import { MemoryStore } from "../src/server/store.js";
 import { processJobMessage } from "../src/worker/runtime.js";
 
@@ -12,14 +12,15 @@ const config = {
   host: "127.0.0.1",
   port: 0,
   reportsBucket: "test-bucket",
-  stockAgentId: "agent_stock_report_daily",
-  stockAgentScheduleId: "sch_stock_report_daily",
-  stockAgentScheduleExpression: "cron(0 9 * * ? *)",
-  stockAgentScheduleTimezone: "America/Los_Angeles"
+  agentConfigPrefix: "accounts",
+  localAgentConfigPath: "config/accounts/default/agents.json"
 };
 
 test("prompt agent resolves stock inputs and creates markdown artifact metadata", async () => {
-  const agent = buildDailyStockPromptAgent(config);
+  const store = new MemoryStore();
+  await seedDefaultAgents(store, config);
+  const agent = await store.getAgent("agent_stock_report_daily");
+  assert.ok(agent);
   const result = await executePromptAgent({
     agent,
     runId: "run_test",
@@ -37,7 +38,9 @@ test("prompt agent resolves stock inputs and creates markdown artifact metadata"
 
 test("agent trigger message creates run, log, and artifact through generic worker", async () => {
   const store = new MemoryStore();
-  const agent = await store.upsertAgent(buildDailyStockPromptAgent(config));
+  await seedDefaultAgents(store, config);
+  const agent = await store.getAgent("agent_stock_report_daily");
+  assert.ok(agent);
   await processJobMessage({
     message: {
       kind: "agent.trigger",
