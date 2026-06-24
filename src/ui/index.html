@@ -23,7 +23,10 @@
 
       <section class="grid">
         <article>
-          <h2>Agents</h2>
+          <div class="panel-heading">
+            <h2>Agents</h2>
+            <button id="toggle-agent-form" class="secondary compact" type="button" aria-expanded="false" aria-controls="agent-create-panel">Create</button>
+          </div>
           <div id="agents" class="list muted">No agents loaded.</div>
         </article>
 
@@ -32,7 +35,7 @@
           <div id="schedules" class="list muted">Set `EVENT_AGENT_AUTH_TOKEN` and connect the API.</div>
         </article>
 
-        <article>
+        <article class="runs-panel">
           <h2>Runs</h2>
           <div id="runs" class="list muted">No runs loaded.</div>
         </article>
@@ -40,7 +43,16 @@
 
       <section class="detail-panel">
         <div class="detail-heading">
+          <h2>Run Detail</h2>
+          <button id="clear-selection" class="secondary" type="button">Clear</button>
+        </div>
+        <div id="run-detail" class="muted">Select a run to inspect logs and artifacts.</div>
+      </section>
+
+      <section id="agent-create-panel" class="detail-panel collapsible-panel" hidden>
+        <div class="detail-heading">
           <h2>Create Agent</h2>
+          <button id="close-agent-form" class="secondary" type="button">Close</button>
         </div>
         <form id="agent-form" class="agent-form">
           <label>
@@ -80,14 +92,6 @@
             <button type="submit">Create Agent</button>
           </div>
         </form>
-      </section>
-
-      <section class="detail-panel">
-        <div class="detail-heading">
-          <h2>Run Detail</h2>
-          <button id="clear-selection" class="secondary" type="button">Clear</button>
-        </div>
-        <div id="run-detail" class="muted">Select a run to inspect logs and artifacts.</div>
       </section>
     </main>
     <script type="module" src="./main.ts"></script>

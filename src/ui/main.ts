@@ -371,6 +371,7 @@ async function createAgent(form: HTMLFormElement): Promise<void> {
     if (modelInput) modelInput.value = "gpt-4.1-mini";
     const providerInput = document.querySelector<HTMLSelectElement>("#agent-provider");
     if (providerInput) providerInput.value = "openai";
+    setAgentFormOpen(false);
     setStatus("Agent created.");
     await load();
   } catch {
@@ -433,6 +434,27 @@ document.querySelector("#clear-selection")?.addEventListener("click", () => {
 document.querySelector<HTMLFormElement>("#agent-form")?.addEventListener("submit", (event) => {
   event.preventDefault();
   void createAgent(event.currentTarget as HTMLFormElement);
+});
+
+function setAgentFormOpen(open: boolean): void {
+  const panel = document.querySelector<HTMLElement>("#agent-create-panel");
+  const toggle = document.querySelector<HTMLButtonElement>("#toggle-agent-form");
+  if (!panel || !toggle) return;
+  panel.hidden = !open;
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.textContent = open ? "Hide" : "Create";
+  if (open) {
+    document.querySelector<HTMLInputElement>("#agent-name")?.focus();
+  }
+}
+
+document.querySelector("#toggle-agent-form")?.addEventListener("click", () => {
+  const panel = document.querySelector<HTMLElement>("#agent-create-panel");
+  setAgentFormOpen(Boolean(panel?.hidden));
+});
+
+document.querySelector("#close-agent-form")?.addEventListener("click", () => {
+  setAgentFormOpen(false);
 });
 
 document.querySelector("#save-token")?.addEventListener("click", () => {
