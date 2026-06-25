@@ -3,6 +3,7 @@ let loadSequence = 0;
 let selectedRunId: string | undefined;
 let selectedAgentId: string | undefined;
 let selectedScheduleId: string | undefined;
+let activeDetail: "agent" | "schedule" | "run" | undefined;
 let editingScheduleId: string | undefined;
 let latestAgents: AgentSummary[] = [];
 let latestSchedules: ScheduleSummary[] = [];
@@ -98,6 +99,8 @@ async function load(): Promise<void> {
   if (!agentsEl || !schedulesEl || !runsEl || !runDetailEl || !agentDetailEl || !scheduleDetailEl) return;
 
   if (!token) {
+    activeDetail = undefined;
+    updateDetailPanels();
     agentsEl.textContent = "Enter the API token and refresh.";
     schedulesEl.textContent = "Enter the API token and refresh.";
     runsEl.textContent = "Enter the API token and refresh.";
@@ -116,6 +119,8 @@ async function load(): Promise<void> {
   if (sequence !== loadSequence) return;
 
   if (!agentsResponse.ok || !schedulesResponse.ok || !runsResponse.ok) {
+    activeDetail = undefined;
+    updateDetailPanels();
     agentsEl.textContent = "API unavailable or unauthorized.";
     schedulesEl.textContent = "API unavailable or unauthorized.";
     runsEl.textContent = "Enter the API token and refresh.";
@@ -138,7 +143,7 @@ async function load(): Promise<void> {
     ? agentsJson.agents
         .map(
           (agent) =>
-            `<div class="row agent-row ${agent.id === selectedAgentId ? "selected" : ""}"><div><strong>${escapeHtml(agent.name)}</strong><span>${escapeHtml(agent.modelProvider)} / ${escapeHtml(agent.model)} · ${agent.enabled ? "enabled" : "disabled"}</span></div><div class="row-actions"><button class="secondary compact" type="button" data-agent-detail-id="${escapeHtml(agent.id)}">Details</button><button class="secondary compact" type="button" data-agent-trigger-id="${escapeHtml(agent.id)}">Run now</button></div></div>`
+            `<div class="row agent-row ${agent.id === selectedAgentId ? "selected" : ""} ${agent.enabled ? "status-enabled" : "status-paused"}"><div><strong>${escapeHtml(agent.name)}</strong><span>${escapeHtml(agent.modelProvider)} / ${escapeHtml(agent.model)} · ${agent.enabled ? "enabled" : "disabled"}</span></div><div class="row-actions"><button class="secondary compact" type="button" data-agent-detail-id="${escapeHtml(agent.id)}">Details</button><button class="secondary compact" type="button" data-agent-trigger-id="${escapeHtml(agent.id)}">Run now</button></div></div>`
         )
         .join("")
     : "No agents yet.";
@@ -146,6 +151,8 @@ async function load(): Promise<void> {
   agentsEl.querySelectorAll<HTMLButtonElement>("[data-agent-detail-id]").forEach((button) => {
     button.addEventListener("click", () => {
       selectedAgentId = button.dataset.agentDetailId;
+      activeDetail = "agent";
+      updateDetailPanels();
       void loadAgentDetail();
       agentsEl.querySelectorAll(".agent-row").forEach((row) => row.classList.remove("selected"));
       button.closest(".agent-row")?.classList.add("selected");
@@ -162,7 +169,7 @@ async function load(): Promise<void> {
     ? schedulesJson.schedules
         .map(
           (schedule) =>
-            `<div class="row schedule-row ${schedule.id === selectedScheduleId ? "selected" : ""}"><div><strong>${escapeHtml(schedule.name)}</strong><span>${escapeHtml(schedule.expression)} -> ${escapeHtml(schedule.queue)} · ${schedule.enabled ? "enabled" : "paused"}</span></div><div class="row-actions"><button class="secondary compact" type="button" data-schedule-detail-id="${escapeHtml(schedule.id)}">Details</button></div></div>`
+            `<div class="row schedule-row ${schedule.id === selectedScheduleId ? "selected" : ""} ${schedule.enabled ? "status-enabled" : "status-paused"}"><div><strong>${escapeHtml(schedule.name)}</strong><span>${escapeHtml(schedule.expression)} -> ${escapeHtml(schedule.queue)} · ${schedule.enabled ? "enabled" : "paused"}</span></div><div class="row-actions"><button class="secondary compact" type="button" data-schedule-detail-id="${escapeHtml(schedule.id)}">Details</button></div></div>`
         )
         .join("")
     : "No schedules yet.";
@@ -177,7 +184,7 @@ async function load(): Promise<void> {
     ? runsJson.runs
         .map(
           (run) =>
-            `<button class="row row-button ${run.id === selectedRunId ? "selected" : ""}" type="button" data-run-id="${escapeHtml(run.id)}"><strong>${escapeHtml(run.status)}</strong><span>${escapeHtml(run.id)} on ${escapeHtml(run.queue)} · ${run.artifactCount ?? 0} artifacts</span></button>`
+            `<button class="row row-button ${run.id === selectedRunId ? "selected" : ""} ${statusClass(run.status)}" type="button" data-run-id="${escapeHtml(run.id)}"><strong>${escapeHtml(run.status)}</strong><span>${escapeHtml(run.id)} on ${escapeHtml(run.queue)} · ${run.artifactCount ?? 0} artifacts</span></button>`
         )
         .join("")
     : "No runs yet.";
@@ -190,7 +197,9 @@ async function load(): Promise<void> {
 
   if (!selectedRunId && runsJson.runs[0]) {
     selectedRunId = runsJson.runs[0].id;
+    if (!activeDetail) activeDetail = "run";
   }
+  updateDetailPanels();
   await loadAgentDetail();
   renderScheduleDetail();
   await loadRunDetail();
@@ -207,6 +216,7 @@ async function loadAgentDetail(): Promise<void> {
   if (!selectedAgentId) {
     agentDetailEl.classList.add("muted");
     agentDetailEl.textContent = "Select an agent to inspect prompt, config, schedules, and runs.";
+    updateDetailPanels();
     return;
   }
 
@@ -349,7 +359,7 @@ function renderAgentSchedules(schedules: ScheduleSummary[]): string {
   return schedules
     .map(
       (schedule) =>
-        `<div class="row schedule-row"><div><strong>${escapeHtml(schedule.name)}</strong><span>${escapeHtml(schedule.expression)} · ${escapeHtml(schedule.timezone)} · ${schedule.enabled ? "enabled" : "paused"}</span></div><button class="secondary compact" type="button" data-agent-schedule-trigger-id="${escapeHtml(schedule.id)}">Run now</button></div>`
+        `<div class="row schedule-row ${schedule.enabled ? "status-enabled" : "status-paused"}"><div><strong>${escapeHtml(schedule.name)}</strong><span>${escapeHtml(schedule.expression)} · ${escapeHtml(schedule.timezone)} · ${schedule.enabled ? "enabled" : "paused"}</span></div><button class="secondary compact" type="button" data-agent-schedule-trigger-id="${escapeHtml(schedule.id)}">Run now</button></div>`
     )
     .join("");
 }
@@ -361,6 +371,7 @@ function renderScheduleDetail(): void {
   if (!schedule) {
     scheduleDetailEl.classList.add("muted");
     scheduleDetailEl.textContent = "Select a schedule to inspect and manage it.";
+    updateDetailPanels();
     return;
   }
 
@@ -413,7 +424,7 @@ function renderAgentRuns(runs: RunSummary[]): string {
   return runs
     .map(
       (run) =>
-        `<button class="row row-button" type="button" data-agent-run-id="${escapeHtml(run.id)}"><strong>${escapeHtml(run.status)}</strong><span>${escapeHtml(run.id)} · ${formatTime(run.finishedAt ?? run.startedAt ?? run.createdAt)} · ${run.artifactCount ?? 0} artifacts</span></button>`
+        `<button class="row row-button ${statusClass(run.status)}" type="button" data-agent-run-id="${escapeHtml(run.id)}"><strong>${escapeHtml(run.status)}</strong><span>${escapeHtml(run.id)} · ${formatTime(run.finishedAt ?? run.startedAt ?? run.createdAt)} · ${run.artifactCount ?? 0} artifacts</span></button>`
     )
     .join("");
 }
@@ -728,6 +739,12 @@ function setStatus(message: string, isError = false): void {
   statusEl.classList.toggle("muted", !isError);
 }
 
+function updateDetailPanels(): void {
+  document.querySelector<HTMLElement>("#agent-detail-panel")?.toggleAttribute("hidden", activeDetail !== "agent");
+  document.querySelector<HTMLElement>("#schedule-detail-panel")?.toggleAttribute("hidden", activeDetail !== "schedule");
+  document.querySelector<HTMLElement>("#run-detail-panel")?.toggleAttribute("hidden", activeDetail !== "run");
+}
+
 function scheduleRefreshes(): void {
   for (const delay of [1500, 4000, 8000]) {
     window.setTimeout(() => {
@@ -804,12 +821,16 @@ function resetScheduleForm(): void {
 
 function setScheduleSubmitLabel(): void {
   const submit = document.querySelector<HTMLButtonElement>('#schedule-form button[type="submit"]');
+  const title = document.querySelector<HTMLElement>("#schedule-form-title");
   if (submit) submit.textContent = editingScheduleId ? "Save Schedule" : "Create Schedule";
+  if (title) title.textContent = editingScheduleId ? "Edit Schedule" : "Create Schedule";
 }
 
 function selectRun(runId: string | undefined): void {
   if (!runId) return;
   selectedRunId = runId;
+  activeDetail = "run";
+  updateDetailPanels();
   void loadRunDetail();
   document.querySelectorAll(".row-button").forEach((row) => row.classList.remove("selected"));
   document.querySelectorAll<HTMLButtonElement>(`[data-run-id="${cssEscape(runId)}"], [data-agent-run-id="${cssEscape(runId)}"]`).forEach((button) =>
@@ -820,11 +841,21 @@ function selectRun(runId: string | undefined): void {
 function selectSchedule(scheduleId: string | undefined): void {
   if (!scheduleId) return;
   selectedScheduleId = scheduleId;
+  activeDetail = "schedule";
+  updateDetailPanels();
   renderScheduleDetail();
   document.querySelectorAll(".schedule-row").forEach((row) => row.classList.remove("selected"));
   document.querySelectorAll<HTMLElement>(`.schedule-row [data-schedule-detail-id="${cssEscape(scheduleId)}"]`).forEach((button) =>
     button.closest(".schedule-row")?.classList.add("selected")
   );
+}
+
+function statusClass(status: string): string {
+  const normalized = status.toLowerCase();
+  if (["succeeded", "success", "enabled"].includes(normalized)) return "status-enabled";
+  if (["running", "in_progress", "processing"].includes(normalized)) return "status-running";
+  if (["failed", "error", "deleted", "delete_failed"].includes(normalized)) return "status-danger";
+  return "status-paused";
 }
 
 function slugify(value: string): string {
@@ -848,6 +879,8 @@ document.querySelector("#refresh")?.addEventListener("click", () => {
 
 document.querySelector("#clear-selection")?.addEventListener("click", () => {
   selectedRunId = undefined;
+  activeDetail = undefined;
+  updateDetailPanels();
   const runDetailEl = document.querySelector("#run-detail");
   if (runDetailEl) {
     runDetailEl.classList.add("muted");
@@ -858,6 +891,8 @@ document.querySelector("#clear-selection")?.addEventListener("click", () => {
 
 document.querySelector("#clear-agent-selection")?.addEventListener("click", () => {
   selectedAgentId = undefined;
+  activeDetail = undefined;
+  updateDetailPanels();
   const agentDetailEl = document.querySelector("#agent-detail");
   if (agentDetailEl) {
     agentDetailEl.classList.add("muted");
@@ -868,6 +903,8 @@ document.querySelector("#clear-agent-selection")?.addEventListener("click", () =
 
 document.querySelector("#clear-schedule-selection")?.addEventListener("click", () => {
   selectedScheduleId = undefined;
+  activeDetail = undefined;
+  updateDetailPanels();
   const scheduleDetailEl = document.querySelector("#schedule-detail");
   if (scheduleDetailEl) {
     scheduleDetailEl.classList.add("muted");

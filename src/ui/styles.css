@@ -141,6 +141,10 @@ article {
   padding: 18px;
 }
 
+.detail-panel[hidden] {
+  display: none;
+}
+
 .detail-heading {
   align-items: center;
   display: flex;
@@ -178,6 +182,26 @@ article {
   display: grid;
   gap: 4px;
   padding: 10px;
+}
+
+.row.status-enabled {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.row.status-paused {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.row.status-running {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.row.status-danger {
+  background: #fff4f3;
+  border-color: #fecdca;
 }
 
 .row-button {

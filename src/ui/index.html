@@ -44,7 +44,7 @@
         </article>
       </section>
 
-      <section class="detail-panel">
+      <section id="agent-detail-panel" class="detail-panel" hidden>
         <div class="detail-heading">
           <h2>Agent Detail</h2>
           <button id="clear-agent-selection" class="secondary" type="button">Clear</button>
@@ -52,7 +52,7 @@
         <div id="agent-detail" class="muted">Select an agent to inspect prompt, config, schedules, and runs.</div>
       </section>
 
-      <section class="detail-panel">
+      <section id="schedule-detail-panel" class="detail-panel" hidden>
         <div class="detail-heading">
           <h2>Schedule Detail</h2>
           <button id="clear-schedule-selection" class="secondary" type="button">Clear</button>
@@ -60,7 +60,7 @@
         <div id="schedule-detail" class="muted">Select a schedule to inspect and manage it.</div>
       </section>
 
-      <section class="detail-panel">
+      <section id="run-detail-panel" class="detail-panel" hidden>
         <div class="detail-heading">
           <h2>Run Detail</h2>
           <button id="clear-selection" class="secondary" type="button">Clear</button>
@@ -70,7 +70,7 @@
 
       <section id="schedule-create-panel" class="detail-panel collapsible-panel" hidden>
         <div class="detail-heading">
-          <h2>Create Schedule</h2>
+          <h2 id="schedule-form-title">Create Schedule</h2>
           <button id="close-schedule-form" class="secondary" type="button">Close</button>
         </div>
         <form id="schedule-form" class="schedule-form">
