@@ -189,7 +189,8 @@ article {
 
 .row-button:hover,
 .row-button.selected,
-.agent-row.selected {
+.agent-row.selected,
+.schedule-row.selected {
   border-color: #155eef;
 }
 
@@ -205,6 +206,12 @@ article {
 }
 
 .row-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.detail-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
