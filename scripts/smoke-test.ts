@@ -112,6 +112,31 @@ test("api smoke flow", async () => {
   assert.equal(triggerResponse.statusCode, 202);
   assert.ok(triggerResponse.json().run.id);
 
+  const pauseResponse = await app.inject({
+    method: "PATCH",
+    url: `/api/schedules/${schedule.id}`,
+    headers: auth,
+    payload: { enabled: false }
+  });
+  assert.equal(pauseResponse.statusCode, 200);
+  assert.equal(pauseResponse.json().schedule.enabled, false);
+
+  const resumeResponse = await app.inject({
+    method: "PATCH",
+    url: `/api/schedules/${schedule.id}`,
+    headers: auth,
+    payload: { enabled: true }
+  });
+  assert.equal(resumeResponse.statusCode, 200);
+  assert.equal(resumeResponse.json().schedule.enabled, true);
+
+  const deleteResponse = await app.inject({
+    method: "DELETE",
+    url: `/api/schedules/${schedule.id}`,
+    headers: auth
+  });
+  assert.equal(deleteResponse.statusCode, 204);
+
   const runsResponse = await app.inject({ method: "GET", url: "/api/runs", headers: auth });
   assert.equal(runsResponse.statusCode, 200);
   assert.equal(runsResponse.json().runs.length, 1);

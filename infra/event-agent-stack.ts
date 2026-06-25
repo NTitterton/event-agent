@@ -273,7 +273,7 @@ export class EventAgentStack extends Stack {
     defaultQueue.grantSendMessages(apiService.taskDefinition.taskRole);
     apiService.taskDefinition.taskRole.addToPrincipalPolicy(
       new iam.PolicyStatement({
-        actions: ["scheduler:CreateSchedule", "scheduler:UpdateSchedule", "scheduler:GetSchedule"],
+        actions: ["scheduler:CreateSchedule", "scheduler:UpdateSchedule", "scheduler:GetSchedule", "scheduler:DeleteSchedule"],
         resources: [`arn:${Stack.of(this).partition}:scheduler:${Stack.of(this).region}:${Stack.of(this).account}:schedule/${name}/*`]
       })
     );

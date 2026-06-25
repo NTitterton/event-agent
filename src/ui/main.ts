@@ -2,6 +2,7 @@ const tokenInput = document.querySelector<HTMLInputElement>("#token");
 let loadSequence = 0;
 let selectedRunId: string | undefined;
 let selectedAgentId: string | undefined;
+let editingScheduleId: string | undefined;
 let latestAgents: AgentSummary[] = [];
 let latestSchedules: ScheduleSummary[] = [];
 let latestRuns: RunSummary[] = [];
@@ -156,14 +157,29 @@ async function load(): Promise<void> {
     ? schedulesJson.schedules
         .map(
           (schedule) =>
-            `<div class="row schedule-row"><div><strong>${escapeHtml(schedule.name)}</strong><span>${escapeHtml(schedule.expression)} -> ${escapeHtml(schedule.queue)} · ${schedule.enabled ? "enabled" : "paused"}</span></div><button class="secondary compact" type="button" data-schedule-trigger-id="${escapeHtml(schedule.id)}">Run now</button></div>`
+            `<div class="row schedule-row"><div><strong>${escapeHtml(schedule.name)}</strong><span>${escapeHtml(schedule.expression)} -> ${escapeHtml(schedule.queue)} · ${schedule.enabled ? "enabled" : "paused"}</span></div><div class="row-actions"><button class="secondary compact" type="button" data-schedule-edit-id="${escapeHtml(schedule.id)}">Edit</button><button class="secondary compact" type="button" data-schedule-toggle-id="${escapeHtml(schedule.id)}">${schedule.enabled ? "Pause" : "Resume"}</button><button class="secondary compact" type="button" data-schedule-trigger-id="${escapeHtml(schedule.id)}">Run now</button><button class="secondary compact danger" type="button" data-schedule-delete-id="${escapeHtml(schedule.id)}">Delete</button></div></div>`
         )
         .join("")
     : "No schedules yet.";
 
+  schedulesEl.querySelectorAll<HTMLButtonElement>("[data-schedule-edit-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      editSchedule(button.dataset.scheduleEditId);
+    });
+  });
+  schedulesEl.querySelectorAll<HTMLButtonElement>("[data-schedule-toggle-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      void toggleSchedule(button.dataset.scheduleToggleId, button);
+    });
+  });
   schedulesEl.querySelectorAll<HTMLButtonElement>("[data-schedule-trigger-id]").forEach((button) => {
     button.addEventListener("click", () => {
       void triggerSchedule(button.dataset.scheduleTriggerId, button);
+    });
+  });
+  schedulesEl.querySelectorAll<HTMLButtonElement>("[data-schedule-delete-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      void deleteSchedule(button.dataset.scheduleDeleteId, button);
     });
   });
 
@@ -531,12 +547,16 @@ async function createSchedule(form: HTMLFormElement): Promise<void> {
     return;
   }
 
-  const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
   const data = new FormData(form);
+  const payload = schedulePayloadFromForm(data);
+  await saveSchedulePayload(payload, form);
+}
+
+function schedulePayloadFromForm(data: FormData) {
   const agentId = String(data.get("agentId") ?? "");
   const agent = latestAgents.find((candidate) => candidate.id === agentId);
   const name = String(data.get("name") ?? "");
-  const payload = {
+  return {
     name,
     expression: String(data.get("expression") ?? ""),
     timezone: String(data.get("timezone") ?? "UTC"),
@@ -549,12 +569,17 @@ async function createSchedule(form: HTMLFormElement): Promise<void> {
       payload: { agentId }
     }
   };
+}
 
+async function saveSchedulePayload(payload: ReturnType<typeof schedulePayloadFromForm>, form: HTMLFormElement): Promise<void> {
+  const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "";
+  const submit = form.querySelector<HTMLButtonElement>('button[type="submit"]');
   submit?.setAttribute("disabled", "true");
-  setStatus("Creating schedule...");
+  const isEdit = Boolean(editingScheduleId);
+  setStatus(isEdit ? "Updating schedule..." : "Creating schedule...");
   try {
-    const response = await fetch("/api/schedules", {
-      method: "POST",
+    const response = await fetch(editingScheduleId ? `/api/schedules/${encodeURIComponent(editingScheduleId)}` : "/api/schedules", {
+      method: editingScheduleId ? "PATCH" : "POST",
       headers: {
         authorization: `Bearer ${token}`,
         "content-type": "application/json"
@@ -563,23 +588,89 @@ async function createSchedule(form: HTMLFormElement): Promise<void> {
     });
     if (!response.ok) {
       const error = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
-      setStatus(error?.error ?? "Schedule creation failed.", true);
+      setStatus(error?.error ?? (isEdit ? "Schedule update failed." : "Schedule creation failed."), true);
       return;
     }
 
-    form.reset();
-    const expressionInput = document.querySelector<HTMLInputElement>("#schedule-expression");
-    if (expressionInput) expressionInput.value = "cron(0 9 * * ? *)";
-    const timezoneInput = document.querySelector<HTMLInputElement>("#schedule-timezone");
-    if (timezoneInput) timezoneInput.value = "America/Los_Angeles";
+    resetScheduleForm();
     renderScheduleAgentOptions();
     setScheduleFormOpen(false);
-    setStatus("Schedule created.");
+    setStatus(isEdit ? "Schedule updated." : "Schedule created.");
     await load();
   } catch {
-    setStatus("Schedule creation failed.", true);
+    setStatus(isEdit ? "Schedule update failed." : "Schedule creation failed.", true);
   } finally {
     submit?.removeAttribute("disabled");
+  }
+}
+
+async function toggleSchedule(scheduleId: string | undefined, button: HTMLButtonElement): Promise<void> {
+  const schedule = latestSchedules.find((candidate) => candidate.id === scheduleId);
+  if (!schedule) return;
+  await patchSchedule(schedule.id, { enabled: !schedule.enabled }, button, schedule.enabled ? "Pausing schedule..." : "Resuming schedule...");
+}
+
+async function deleteSchedule(scheduleId: string | undefined, button: HTMLButtonElement): Promise<void> {
+  const schedule = latestSchedules.find((candidate) => candidate.id === scheduleId);
+  if (!schedule) return;
+  if (!window.confirm(`Delete schedule "${schedule.name}"?`)) return;
+  const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "";
+  if (!token) {
+    setStatus("Enter the API token before deleting a schedule.", true);
+    return;
+  }
+
+  button.disabled = true;
+  setStatus("Deleting schedule...");
+  try {
+    const response = await fetch(`/api/schedules/${encodeURIComponent(schedule.id)}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) {
+      const error = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+      setStatus(error?.error ?? "Schedule delete failed.", true);
+      return;
+    }
+    if (editingScheduleId === schedule.id) resetScheduleForm();
+    setStatus("Schedule deleted.");
+    await load();
+  } catch {
+    setStatus("Schedule delete failed.", true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function patchSchedule(scheduleId: string, patch: Partial<ScheduleSummary>, button: HTMLButtonElement, statusMessage: string): Promise<void> {
+  const token = tokenInput?.value.trim() || window.localStorage.getItem("event-agent-token") || "";
+  if (!token) {
+    setStatus("Enter the API token before updating a schedule.", true);
+    return;
+  }
+
+  button.disabled = true;
+  setStatus(statusMessage);
+  try {
+    const response = await fetch(`/api/schedules/${encodeURIComponent(scheduleId)}`, {
+      method: "PATCH",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(patch)
+    });
+    if (!response.ok) {
+      const error = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+      setStatus(error?.error ?? "Schedule update failed.", true);
+      return;
+    }
+    setStatus("Schedule updated.");
+    await load();
+  } catch {
+    setStatus("Schedule update failed.", true);
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -635,6 +726,39 @@ function renderScheduleAgentOptions(): void {
     .map((agent) => `<option value="${escapeHtml(agent.id)}">${escapeHtml(agent.name)}</option>`)
     .join("");
   if (latestAgents.some((agent) => agent.id === current)) select.value = current;
+}
+
+function editSchedule(scheduleId: string | undefined): void {
+  const schedule = latestSchedules.find((candidate) => candidate.id === scheduleId);
+  if (!schedule) return;
+  editingScheduleId = schedule.id;
+  setScheduleFormOpen(true);
+  const nameInput = document.querySelector<HTMLInputElement>("#schedule-name");
+  const agentSelect = document.querySelector<HTMLSelectElement>("#schedule-agent");
+  const expressionInput = document.querySelector<HTMLInputElement>("#schedule-expression");
+  const timezoneInput = document.querySelector<HTMLInputElement>("#schedule-timezone");
+  if (nameInput) nameInput.value = schedule.name;
+  if (expressionInput) expressionInput.value = schedule.expression;
+  if (timezoneInput) timezoneInput.value = schedule.timezone;
+  if (agentSelect && typeof schedule.event.payload.agentId === "string") agentSelect.value = schedule.event.payload.agentId;
+  setScheduleSubmitLabel();
+}
+
+function resetScheduleForm(): void {
+  editingScheduleId = undefined;
+  const form = document.querySelector<HTMLFormElement>("#schedule-form");
+  form?.reset();
+  const expressionInput = document.querySelector<HTMLInputElement>("#schedule-expression");
+  if (expressionInput) expressionInput.value = "cron(0 9 * * ? *)";
+  const timezoneInput = document.querySelector<HTMLInputElement>("#schedule-timezone");
+  if (timezoneInput) timezoneInput.value = "America/Los_Angeles";
+  renderScheduleAgentOptions();
+  setScheduleSubmitLabel();
+}
+
+function setScheduleSubmitLabel(): void {
+  const submit = document.querySelector<HTMLButtonElement>('#schedule-form button[type="submit"]');
+  if (submit) submit.textContent = editingScheduleId ? "Save Schedule" : "Create Schedule";
 }
 
 function selectRun(runId: string | undefined): void {
@@ -716,6 +840,7 @@ function setScheduleFormOpen(open: boolean): void {
   toggle.setAttribute("aria-expanded", String(open));
   toggle.textContent = open ? "Hide" : "Create";
   renderScheduleAgentOptions();
+  setScheduleSubmitLabel();
   if (open) {
     document.querySelector<HTMLInputElement>("#schedule-name")?.focus();
   }
@@ -732,10 +857,12 @@ document.querySelector("#close-agent-form")?.addEventListener("click", () => {
 
 document.querySelector("#toggle-schedule-form")?.addEventListener("click", () => {
   const panel = document.querySelector<HTMLElement>("#schedule-create-panel");
+  if (panel?.hidden) resetScheduleForm();
   setScheduleFormOpen(Boolean(panel?.hidden));
 });
 
 document.querySelector("#close-schedule-form")?.addEventListener("click", () => {
+  resetScheduleForm();
   setScheduleFormOpen(false);
 });
 

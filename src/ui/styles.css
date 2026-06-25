@@ -61,6 +61,11 @@ button.secondary {
   color: #344054;
 }
 
+button.danger {
+  background: #fff4f3;
+  color: #b42318;
+}
+
 button.compact {
   padding: 8px 10px;
   white-space: nowrap;
@@ -201,7 +206,9 @@ article {
 
 .row-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-end;
 }
 
 .schedule-row > div,

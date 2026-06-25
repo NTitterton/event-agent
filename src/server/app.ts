@@ -152,12 +152,18 @@ export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInsta
     if (!parsed.success) return reply.code(400).send({ error: "Invalid schedule", details: parsed.error.flatten() });
     const schedule = await store.updateSchedule(request.params.id, parsed.data);
     if (!schedule) return reply.code(404).send({ error: "Schedule not found" });
+    await upsertScheduleInConfig(config, schedule);
+    await scheduleReconciler.upsertSchedule(schedule);
     return { schedule };
   });
 
   app.delete<{ Params: { id: string } }>("/api/schedules/:id", async (request, reply) => {
+    const schedule = (await store.listSchedules()).find((candidate) => candidate.id === request.params.id);
+    if (!schedule) return reply.code(404).send({ error: "Schedule not found" });
     const deleted = await store.deleteSchedule(request.params.id);
     if (!deleted) return reply.code(404).send({ error: "Schedule not found" });
+    await removeScheduleFromConfig(config, schedule.id);
+    await scheduleReconciler.deleteSchedule(schedule);
     return reply.code(204).send();
   });
 
@@ -294,7 +300,26 @@ async function saveScheduleToConfig(config: AppConfig, schedule: Schedule): Prom
   if (document.schedules.some((existing) => existing.id === schedule.id)) {
     throw new Error(`Schedule ${schedule.id} already exists in config`);
   }
-  document.schedules.push({
+  document.schedules.push(scheduleConfigFor(schedule));
+  await saveAgentConfigDocument(config, document);
+}
+
+async function upsertScheduleInConfig(config: AppConfig, schedule: Schedule): Promise<void> {
+  const document = await loadAgentConfigDocument(config);
+  const index = document.schedules.findIndex((existing) => existing.id === schedule.id);
+  if (index === -1) document.schedules.push(scheduleConfigFor(schedule));
+  if (index !== -1) document.schedules[index] = scheduleConfigFor(schedule);
+  await saveAgentConfigDocument(config, document);
+}
+
+async function removeScheduleFromConfig(config: AppConfig, scheduleId: string): Promise<void> {
+  const document = await loadAgentConfigDocument(config);
+  document.schedules = document.schedules.filter((schedule) => schedule.id !== scheduleId);
+  await saveAgentConfigDocument(config, document);
+}
+
+function scheduleConfigFor(schedule: Schedule) {
+  return {
     id: schedule.id,
     name: schedule.name,
     expression: schedule.expression,
@@ -302,8 +327,7 @@ async function saveScheduleToConfig(config: AppConfig, schedule: Schedule): Prom
     enabled: schedule.enabled,
     queue: schedule.queue,
     event: schedule.event
-  });
-  await saveAgentConfigDocument(config, document);
+  };
 }
 
 async function sendUiAsset(reply: FastifyReply, uiDistPath: string, assetPath: string) {

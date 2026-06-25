@@ -1,13 +1,18 @@
-import { CreateScheduleCommand, SchedulerClient, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
+import { CreateScheduleCommand, DeleteScheduleCommand, SchedulerClient, UpdateScheduleCommand } from "@aws-sdk/client-scheduler";
 import type { AppConfig } from "../shared/config.js";
 import type { Schedule } from "../shared/types.js";
 
 export interface ScheduleReconciler {
   upsertSchedule(schedule: Schedule): Promise<void>;
+  deleteSchedule(schedule: Schedule): Promise<void>;
 }
 
 export class NoopScheduleReconciler implements ScheduleReconciler {
   async upsertSchedule(_schedule: Schedule): Promise<void> {
+    return;
+  }
+
+  async deleteSchedule(_schedule: Schedule): Promise<void> {
     return;
   }
 }
@@ -26,6 +31,20 @@ export class EventBridgeScheduleReconciler implements ScheduleReconciler {
     } catch (error) {
       if (!isConflict(error)) throw error;
       await this.client.send(new UpdateScheduleCommand(input));
+    }
+  }
+
+  async deleteSchedule(schedule: Schedule): Promise<void> {
+    if (!this.config.schedulerGroupName) throw new Error("Scheduler group is required");
+    try {
+      await this.client.send(
+        new DeleteScheduleCommand({
+          Name: schedule.id,
+          GroupName: this.config.schedulerGroupName
+        })
+      );
+    } catch (error) {
+      if (!isNotFound(error)) throw error;
     }
   }
 }
@@ -68,4 +87,8 @@ function buildScheduleInput(config: AppConfig, schedule: Schedule) {
 
 function isConflict(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "name" in error && error.name === "ConflictException");
+}
+
+function isNotFound(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "name" in error && error.name === "ResourceNotFoundException");
 }

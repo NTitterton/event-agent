@@ -192,6 +192,7 @@ export class PgStore implements Store {
 
   async deleteSchedule(id: string): Promise<boolean> {
     await this.init();
+    await this.pool.query("update runs set schedule_id = null, updated_at = $2 where schedule_id = $1", [id, new Date().toISOString()]);
     const result = await this.pool.query("delete from schedules where id = $1", [id]);
     return Boolean(result.rowCount);
   }

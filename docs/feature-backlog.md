@@ -11,7 +11,7 @@ This is the living list of features and platform work we want to consider after 
 - [Partial] Manual run form: trigger an agent immediately from the Agents list. Optional input overrides remain pending.
 - [Done] Run detail page: show logs, status transitions, selected inputs, model metadata, and generated artifacts.
 - [Done] Artifact browser: list S3 reports, preview markdown, and download artifacts through authenticated API routes.
-- [Partial] Schedule editor: create agent schedules and manually trigger schedules from the UI. Pause/resume/delete/edit remain pending.
+- [Done] Schedule editor: create, edit, pause, resume, delete, and manually trigger schedules from the UI.
 - [Done] Report links: show the generated `s3://...` key and optionally a short-lived presigned download URL.
 
 ## Agent And Model Runtime
