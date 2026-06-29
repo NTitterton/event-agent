@@ -138,66 +138,12 @@ async function load(): Promise<void> {
   latestRuns = runsJson.runs;
   if (selectedScheduleId && !latestSchedules.some((schedule) => schedule.id === selectedScheduleId)) selectedScheduleId = undefined;
   renderScheduleAgentOptions();
-
-  agentsEl.innerHTML = agentsJson.agents.length
-    ? agentsJson.agents
-        .map(
-          (agent) =>
-            `<div class="row agent-row ${agent.id === selectedAgentId ? "selected" : ""} ${agent.enabled ? "status-enabled" : "status-paused"}"><div><strong>${escapeHtml(agent.name)}</strong><span>${escapeHtml(agent.modelProvider)} / ${escapeHtml(agent.model)} · ${agent.enabled ? "enabled" : "disabled"}</span></div><div class="row-actions"><button class="secondary compact" type="button" data-agent-detail-id="${escapeHtml(agent.id)}">Details</button><button class="secondary compact" type="button" data-agent-trigger-id="${escapeHtml(agent.id)}">Run now</button></div></div>`
-        )
-        .join("")
-    : "No agents yet.";
-
-  agentsEl.querySelectorAll<HTMLButtonElement>("[data-agent-detail-id]").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectedAgentId = button.dataset.agentDetailId;
-      activeDetail = "agent";
-      updateDetailPanels();
-      void loadAgentDetail();
-      agentsEl.querySelectorAll(".agent-row").forEach((row) => row.classList.remove("selected"));
-      button.closest(".agent-row")?.classList.add("selected");
-    });
-  });
-
-  agentsEl.querySelectorAll<HTMLButtonElement>("[data-agent-trigger-id]").forEach((button) => {
-    button.addEventListener("click", () => {
-      void triggerAgent(button.dataset.agentTriggerId, button);
-    });
-  });
-
-  schedulesEl.innerHTML = schedulesJson.schedules.length
-    ? schedulesJson.schedules
-        .map(
-          (schedule) =>
-            `<div class="row schedule-row ${schedule.id === selectedScheduleId ? "selected" : ""} ${schedule.enabled ? "status-enabled" : "status-paused"}"><div><strong>${escapeHtml(schedule.name)}</strong><span>${escapeHtml(schedule.expression)} -> ${escapeHtml(schedule.queue)} · ${schedule.enabled ? "enabled" : "paused"}</span></div><div class="row-actions"><button class="secondary compact" type="button" data-schedule-detail-id="${escapeHtml(schedule.id)}">Details</button></div></div>`
-        )
-        .join("")
-    : "No schedules yet.";
-
-  schedulesEl.querySelectorAll<HTMLButtonElement>("[data-schedule-detail-id]").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectSchedule(button.dataset.scheduleDetailId);
-    });
-  });
-
-  runsEl.innerHTML = runsJson.runs.length
-    ? runsJson.runs
-        .map(
-          (run) =>
-            `<button class="row row-button ${run.id === selectedRunId ? "selected" : ""} ${statusClass(run.status)}" type="button" data-run-id="${escapeHtml(run.id)}"><strong>${escapeHtml(run.status)}</strong><span>${escapeHtml(run.id)} on ${escapeHtml(run.queue)} · ${run.artifactCount ?? 0} artifacts</span></button>`
-        )
-        .join("")
-    : "No runs yet.";
-
-  runsEl.querySelectorAll<HTMLButtonElement>("[data-run-id]").forEach((button) => {
-    button.addEventListener("click", () => {
-      selectRun(button.dataset.runId);
-    });
-  });
+  renderVisibleLists();
 
   if (!selectedRunId && runsJson.runs[0]) {
     selectedRunId = runsJson.runs[0].id;
     if (!activeDetail) activeDetail = "run";
+    renderRunsList();
   }
   updateDetailPanels();
   await loadAgentDetail();
@@ -362,6 +308,133 @@ function renderAgentSchedules(schedules: ScheduleSummary[]): string {
         `<div class="row schedule-row ${schedule.enabled ? "status-enabled" : "status-paused"}"><div><strong>${escapeHtml(schedule.name)}</strong><span>${escapeHtml(schedule.expression)} · ${escapeHtml(schedule.timezone)} · ${schedule.enabled ? "enabled" : "paused"}</span></div><button class="secondary compact" type="button" data-agent-schedule-trigger-id="${escapeHtml(schedule.id)}">Run now</button></div>`
     )
     .join("");
+}
+
+function renderVisibleLists(): void {
+  renderAgentsList();
+  renderSchedulesList();
+  renderRunsList();
+}
+
+function renderAgentsList(): void {
+  const agentsEl = document.querySelector("#agents");
+  if (!agentsEl) return;
+  const agents = latestAgents.filter(agentMatchesFilters);
+  agentsEl.classList.toggle("muted", !agents.length);
+  agentsEl.innerHTML = agents.length
+    ? agents.map(renderAgentRow).join("")
+    : latestAgents.length
+      ? "No agents match the current filters."
+      : "No agents yet.";
+
+  agentsEl.querySelectorAll<HTMLButtonElement>("[data-agent-detail-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedAgentId = button.dataset.agentDetailId;
+      activeDetail = "agent";
+      updateDetailPanels();
+      void loadAgentDetail();
+      renderVisibleLists();
+    });
+  });
+
+  agentsEl.querySelectorAll<HTMLButtonElement>("[data-agent-trigger-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      void triggerAgent(button.dataset.agentTriggerId, button);
+    });
+  });
+}
+
+function renderSchedulesList(): void {
+  const schedulesEl = document.querySelector("#schedules");
+  if (!schedulesEl) return;
+  const schedules = latestSchedules.filter(scheduleMatchesFilters);
+  schedulesEl.classList.toggle("muted", !schedules.length);
+  schedulesEl.innerHTML = schedules.length
+    ? schedules.map(renderScheduleRow).join("")
+    : latestSchedules.length
+      ? "No schedules match the current filters."
+      : "No schedules yet.";
+
+  schedulesEl.querySelectorAll<HTMLButtonElement>("[data-schedule-detail-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectSchedule(button.dataset.scheduleDetailId);
+    });
+  });
+}
+
+function renderRunsList(): void {
+  const runsEl = document.querySelector("#runs");
+  if (!runsEl) return;
+  const runs = latestRuns.filter(runMatchesFilters);
+  runsEl.classList.toggle("muted", !runs.length);
+  runsEl.innerHTML = runs.length
+    ? runs.map(renderRunRow).join("")
+    : latestRuns.length
+      ? "No runs match the current filters."
+      : "No runs yet.";
+
+  runsEl.querySelectorAll<HTMLButtonElement>("[data-run-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectRun(button.dataset.runId);
+    });
+  });
+}
+
+function renderAgentRow(agent: AgentSummary): string {
+  return `<div class="row agent-row ${agent.id === selectedAgentId ? "selected" : ""} ${agent.enabled ? "status-enabled" : "status-paused"}"><div><strong>${escapeHtml(agent.name)}</strong><span>${escapeHtml(agent.modelProvider)} / ${escapeHtml(agent.model)} · ${agent.enabled ? "enabled" : "disabled"}</span></div><div class="row-actions"><button class="secondary compact" type="button" data-agent-detail-id="${escapeHtml(agent.id)}">Details</button><button class="secondary compact" type="button" data-agent-trigger-id="${escapeHtml(agent.id)}">Run now</button></div></div>`;
+}
+
+function renderScheduleRow(schedule: ScheduleSummary): string {
+  return `<div class="row schedule-row ${schedule.id === selectedScheduleId ? "selected" : ""} ${schedule.enabled ? "status-enabled" : "status-paused"}"><div><strong>${escapeHtml(schedule.name)}</strong><span>${escapeHtml(schedule.expression)} -> ${escapeHtml(schedule.queue)} · ${schedule.enabled ? "enabled" : "paused"}</span></div><div class="row-actions"><button class="secondary compact" type="button" data-schedule-detail-id="${escapeHtml(schedule.id)}">Details</button></div></div>`;
+}
+
+function renderRunRow(run: RunSummary): string {
+  return `<button class="row row-button ${run.id === selectedRunId ? "selected" : ""} ${statusClass(run.status)}" type="button" data-run-id="${escapeHtml(run.id)}"><strong>${escapeHtml(run.status)}</strong><span>${escapeHtml(run.id)} on ${escapeHtml(run.queue)} · ${run.artifactCount ?? 0} artifacts</span></button>`;
+}
+
+function agentMatchesFilters(agent: AgentSummary): boolean {
+  const status = selectValue("#agent-filter-status");
+  if (status === "enabled" && !agent.enabled) return false;
+  if (status === "disabled" && agent.enabled) return false;
+  return includesQuery([agent.name, agent.description, agent.modelProvider, agent.model, agent.slug], inputValue("#agent-filter-text"));
+}
+
+function scheduleMatchesFilters(schedule: ScheduleSummary): boolean {
+  const status = selectValue("#schedule-filter-status");
+  if (status === "enabled" && !schedule.enabled) return false;
+  if (status === "paused" && schedule.enabled) return false;
+  return includesQuery(
+    [schedule.name, schedule.expression, schedule.queue, schedule.timezone, schedule.event.type, String(schedule.event.payload.agentId ?? "")],
+    inputValue("#schedule-filter-text")
+  );
+}
+
+function runMatchesFilters(run: RunSummary): boolean {
+  const status = selectValue("#run-filter-status");
+  if (status !== "all" && runStatusGroup(run.status) !== status) return false;
+  return includesQuery([run.id, run.status, run.queue, run.agentId, run.scheduleId, run.workerId, run.error], inputValue("#run-filter-text"));
+}
+
+function runStatusGroup(status: string): string {
+  const normalized = status.toLowerCase();
+  if (["succeeded", "success"].includes(normalized)) return "succeeded";
+  if (["running", "in_progress", "processing"].includes(normalized)) return "running";
+  if (["failed", "error"].includes(normalized)) return "failed";
+  return "other";
+}
+
+function includesQuery(values: Array<string | null | undefined>, query: string): boolean {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+  return values.some((value) => String(value ?? "").toLowerCase().includes(normalized));
+}
+
+function inputValue(selector: string): string {
+  return document.querySelector<HTMLInputElement>(selector)?.value ?? "";
+}
+
+function selectValue(selector: string): string {
+  return document.querySelector<HTMLSelectElement>(selector)?.value ?? "all";
 }
 
 function renderScheduleDetail(): void {
@@ -844,10 +917,7 @@ function selectSchedule(scheduleId: string | undefined): void {
   activeDetail = "schedule";
   updateDetailPanels();
   renderScheduleDetail();
-  document.querySelectorAll(".schedule-row").forEach((row) => row.classList.remove("selected"));
-  document.querySelectorAll<HTMLElement>(`.schedule-row [data-schedule-detail-id="${cssEscape(scheduleId)}"]`).forEach((button) =>
-    button.closest(".schedule-row")?.classList.add("selected")
-  );
+  renderSchedulesList();
 }
 
 function statusClass(status: string): string {
@@ -877,6 +947,21 @@ document.querySelector("#refresh")?.addEventListener("click", () => {
   void load();
 });
 
+document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("#agent-filter-text, #agent-filter-status").forEach((control) => {
+  control.addEventListener("input", renderAgentsList);
+  control.addEventListener("change", renderAgentsList);
+});
+
+document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("#schedule-filter-text, #schedule-filter-status").forEach((control) => {
+  control.addEventListener("input", renderSchedulesList);
+  control.addEventListener("change", renderSchedulesList);
+});
+
+document.querySelectorAll<HTMLInputElement | HTMLSelectElement>("#run-filter-text, #run-filter-status").forEach((control) => {
+  control.addEventListener("input", renderRunsList);
+  control.addEventListener("change", renderRunsList);
+});
+
 document.querySelector("#clear-selection")?.addEventListener("click", () => {
   selectedRunId = undefined;
   activeDetail = undefined;
@@ -886,7 +971,7 @@ document.querySelector("#clear-selection")?.addEventListener("click", () => {
     runDetailEl.classList.add("muted");
     runDetailEl.textContent = "Select a run to inspect logs and artifacts.";
   }
-  document.querySelectorAll(".row-button").forEach((row) => row.classList.remove("selected"));
+  renderRunsList();
 });
 
 document.querySelector("#clear-agent-selection")?.addEventListener("click", () => {
@@ -898,7 +983,7 @@ document.querySelector("#clear-agent-selection")?.addEventListener("click", () =
     agentDetailEl.classList.add("muted");
     agentDetailEl.textContent = "Select an agent to inspect prompt, config, schedules, and runs.";
   }
-  document.querySelectorAll(".agent-row").forEach((row) => row.classList.remove("selected"));
+  renderAgentsList();
 });
 
 document.querySelector("#clear-schedule-selection")?.addEventListener("click", () => {
@@ -910,7 +995,7 @@ document.querySelector("#clear-schedule-selection")?.addEventListener("click", (
     scheduleDetailEl.classList.add("muted");
     scheduleDetailEl.textContent = "Select a schedule to inspect and manage it.";
   }
-  document.querySelectorAll(".schedule-row").forEach((row) => row.classList.remove("selected"));
+  renderSchedulesList();
 });
 
 document.querySelector<HTMLFormElement>("#agent-form")?.addEventListener("submit", (event) => {

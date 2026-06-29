@@ -60,6 +60,37 @@ test("api smoke flow", async () => {
   assert.equal(agentsAfterCreateResponse.statusCode, 200);
   assert.equal(agentsAfterCreateResponse.json().agents.length, 2);
 
+  const updateAgentResponse = await app.inject({
+    method: "PATCH",
+    url: `/api/agents/${createdAgent.id}`,
+    headers: auth,
+    payload: {
+      name: "Updated Smoke Prompt Agent",
+      enabled: false,
+      model: "gpt-4.1-mini",
+      systemPrompt: "You are still a concise test agent."
+    }
+  });
+  assert.equal(updateAgentResponse.statusCode, 200);
+  assert.equal(updateAgentResponse.json().agent.name, "Updated Smoke Prompt Agent");
+  assert.equal(updateAgentResponse.json().agent.enabled, false);
+
+  const disabledAgentTriggerResponse = await app.inject({
+    method: "POST",
+    url: `/api/agents/${createdAgent.id}/trigger`,
+    headers: auth
+  });
+  assert.equal(disabledAgentTriggerResponse.statusCode, 409);
+
+  const reenableAgentResponse = await app.inject({
+    method: "PATCH",
+    url: `/api/agents/${createdAgent.id}`,
+    headers: auth,
+    payload: { enabled: true }
+  });
+  assert.equal(reenableAgentResponse.statusCode, 200);
+  assert.equal(reenableAgentResponse.json().agent.enabled, true);
+
   const agentTriggerResponse = await app.inject({
     method: "POST",
     url: `/api/agents/${createdAgent.id}/trigger`,
@@ -129,6 +160,28 @@ test("api smoke flow", async () => {
   });
   assert.equal(resumeResponse.statusCode, 200);
   assert.equal(resumeResponse.json().schedule.enabled, true);
+
+  const deleteAgentResponse = await app.inject({
+    method: "DELETE",
+    url: `/api/agents/${createdAgent.id}`,
+    headers: auth
+  });
+  assert.equal(deleteAgentResponse.statusCode, 204);
+
+  const deletedAgentResponse = await app.inject({
+    method: "GET",
+    url: `/api/agents/${createdAgent.id}`,
+    headers: auth
+  });
+  assert.equal(deletedAgentResponse.statusCode, 200);
+  assert.equal(deletedAgentResponse.json().agent.enabled, false);
+
+  const deletedAgentTriggerResponse = await app.inject({
+    method: "POST",
+    url: `/api/agents/${createdAgent.id}/trigger`,
+    headers: auth
+  });
+  assert.equal(deletedAgentTriggerResponse.statusCode, 409);
 
   const deleteResponse = await app.inject({
     method: "DELETE",

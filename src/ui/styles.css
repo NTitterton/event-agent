@@ -160,6 +160,25 @@ article {
   margin-bottom: 12px;
 }
 
+.filters {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: 12px;
+}
+
+.filters input,
+.filters select {
+  font-size: 13px;
+  min-width: 0;
+  padding: 8px 9px;
+  width: 100%;
+}
+
+.filters select {
+  width: auto;
+}
+
 .list {
   display: grid;
   gap: 8px;
@@ -479,6 +498,7 @@ h3 {
   }
 
   .detail-grid,
+  .filters,
   .log-row,
   .artifact-row,
   .prompt-grid {

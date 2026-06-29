@@ -62,11 +62,11 @@ graph TD
 
 The system has four main subsystems:
 
-- **Control plane:** authenticated API, data-driven agent creation, schedule creation, EventBridge Scheduler reconciliation for created agent schedules, manual triggers, run inspection, retry/cancel actions, and UI assets.
+- **Control plane:** authenticated API, data-driven agent creation, agent detail inspection, schedule create/edit/pause/resume/delete, EventBridge Scheduler reconciliation for API-created agent schedules, manual triggers, run inspection, retry/cancel actions, artifact access, and UI assets.
 - **Trigger adapters:** EventBridge Scheduler for cron/rate events, API events for external triggers, internal events from workers/control-plane logic, and future webhook adapters.
 - **Persistence and messaging:** RDS PostgreSQL for queryable state and SQS for durable executable work.
 - **Workers:** stateless ECS/Fargate services that consume queues, lease runs, execute jobs, emit logs, and update status.
-- **Agents:** data-driven prompt definitions loaded from account-scoped S3 JSON config and upserted into Postgres for query/runtime state. A prompt agent contains prompt text, input resolver config, model provider/model, and output settings. Adding an agent should not require adding an agent-specific TypeScript file.
+- **Agents:** data-driven prompt definitions loaded from account-scoped S3 JSON config and upserted into Postgres for query/runtime state. A prompt agent contains prompt text, input resolver config, model provider/model, and output settings. Adding an agent should not require adding an agent-specific TypeScript file. Updating/deleting agents is planned as config-backed control-plane behavior.
 
 The first implementation keeps the adapter interfaces small so local smoke tests can run with in-memory adapters while hosted runtime uses AWS-backed adapters.
 
@@ -154,7 +154,22 @@ Workers must:
 - Keep side effects idempotent via event/run dedupe keys.
 - Respect timeout and cancellation signals.
 
-## 6. Safety Model
+## 6. Operations UI Contract
+
+The browser UI is an operations surface, not a marketing page. It should stay dense and predictable:
+
+- The top three swim lanes are agents, schedules, and runs.
+- List rows stay compact and scannable.
+- Detailed management actions live in the selected detail panel.
+- Only one detail panel is visible at a time.
+- Agent detail shows prompt, resolver config, output settings, related schedules, recent runs, and manual trigger.
+- Schedule detail shows expression, timezone, target agent, queue, and actions for edit, pause/resume, run now, and delete.
+- Run detail shows status, worker/attempt metadata, logs, artifacts, markdown preview, and short-lived artifact links.
+- Status color semantics are shared across swim lanes: green for enabled/succeeded, yellow for paused/disabled/waiting, blue for running, and red for failed or destructive states.
+
+Near-term list filtering should build on this pattern by filtering within the lanes, not by adding competing pages. Expected first filters are status, agent, schedule, text search, and time window.
+
+## 7. Safety Model
 
 V1 safety priorities:
 
@@ -173,7 +188,7 @@ Future safety additions:
 - Webhook signature verification.
 - Policy engine for tools, networks, and filesystem access.
 
-## 7. Implementation Shape
+## 8. Implementation Shape
 
 Initial repo layout:
 
@@ -189,7 +204,7 @@ Initial repo layout:
 
 The first hosted prompt-agent checkpoint uses Postgres for state, SQS for work, S3 for markdown report artifacts, S3 for account-scoped agent config, and a direct model-provider adapter. The daily stock agent, its prompt, model settings, output settings, schedule definition, and static stock input list live in `config/accounts/default/agents.json`; TypeScript remains generic platform code.
 
-## 8. Agent Config Source
+## 9. Agent Config Source
 
 Runtime startup calls `seedDefaultAgents`, which loads the agent config document from:
 
@@ -200,4 +215,6 @@ Runtime startup calls `seedDefaultAgents`, which loads the agent config document
 
 The dev stack pins `EVENT_AGENT_CONFIG_ACCOUNT_ID=default` for now. The API writes created agents back to `accounts/default/agents.json`, preserving the starter seed as fallback-only config. A later scoped-token or OIDC model can map each caller/account to its own config object without changing the worker execution contract.
 
-Current limitation: the API creates EventBridge Scheduler resources for newly created agent schedules, but there is not yet a full reconciliation loop that continuously diffs S3/database schedule definitions against EventBridge Scheduler. The daily stock example still has a CDK-managed scheduler resource for bootstrapping.
+Agent config is the source for prompt text, model provider/model selection, resolver settings, output settings, and default schedule definitions. The API currently writes created agents and schedule changes back to the active account config document. Agent update/delete should use the same document-level upsert/remove path so Postgres, S3 config, and the UI stay aligned.
+
+Current limitation: the API creates, updates, pauses/resumes, and deletes EventBridge Scheduler resources for schedules created through the API, but there is not yet a full reconciliation loop that continuously diffs S3/database schedule definitions against EventBridge Scheduler. The daily stock example still has a CDK-managed scheduler resource for bootstrapping.

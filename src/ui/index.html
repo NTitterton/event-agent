@@ -27,6 +27,14 @@
             <h2>Agents</h2>
             <button id="toggle-agent-form" class="secondary compact" type="button" aria-expanded="false" aria-controls="agent-create-panel">Create</button>
           </div>
+          <div class="filters" aria-label="Agent filters">
+            <input id="agent-filter-text" type="search" autocomplete="off" placeholder="Search agents" />
+            <select id="agent-filter-status" aria-label="Agent status">
+              <option value="all">All</option>
+              <option value="enabled">Enabled</option>
+              <option value="disabled">Disabled</option>
+            </select>
+          </div>
           <div id="agents" class="list muted">No agents loaded.</div>
         </article>
 
@@ -35,11 +43,29 @@
             <h2>Schedules</h2>
             <button id="toggle-schedule-form" class="secondary compact" type="button" aria-expanded="false" aria-controls="schedule-create-panel">Create</button>
           </div>
+          <div class="filters" aria-label="Schedule filters">
+            <input id="schedule-filter-text" type="search" autocomplete="off" placeholder="Search schedules" />
+            <select id="schedule-filter-status" aria-label="Schedule status">
+              <option value="all">All</option>
+              <option value="enabled">Enabled</option>
+              <option value="paused">Paused</option>
+            </select>
+          </div>
           <div id="schedules" class="list muted">Set `EVENT_AGENT_AUTH_TOKEN` and connect the API.</div>
         </article>
 
         <article class="runs-panel">
           <h2>Runs</h2>
+          <div class="filters" aria-label="Run filters">
+            <input id="run-filter-text" type="search" autocomplete="off" placeholder="Search runs" />
+            <select id="run-filter-status" aria-label="Run status">
+              <option value="all">All</option>
+              <option value="running">Running</option>
+              <option value="succeeded">Succeeded</option>
+              <option value="failed">Failed</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
           <div id="runs" class="list muted">No runs loaded.</div>
         </article>
       </section>

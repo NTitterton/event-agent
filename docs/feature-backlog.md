@@ -5,14 +5,18 @@ This is the living list of features and platform work we want to consider after 
 ## Near-Term Product Features
 
 - [Done] Agent detail view: show prompt, model provider, model, config, output target, schedules, recent runs, logs, and artifacts.
-- [Partial] Agent editor: create data-driven prompt agents without adding TypeScript files. Update/delete remains pending.
-- [Partial] S3 agent config editor/importer: API-created agents are persisted to account-scoped `agents.json`; full import/diff/rollback remains pending.
+- [Partial] Agent editor: create data-driven prompt agents without adding TypeScript files. Backend update, enable/disable, and soft-delete APIs exist; frontend edit/delete controls and config-backed validation remain pending.
+- [Partial] Agent delete flow: backend soft-deletes agents, removes them from account-scoped config, rejects disabled-agent triggers, and preserves historical runs/artifacts. Frontend detail-panel controls and schedule-target handling remain pending.
+- [Partial] Agent edit flow: backend updates name, description, provider/model, prompts, output prefix, and enabled state while writing back to account-scoped config. Frontend detail-panel controls remain pending.
+- [Partial] S3 agent config editor/importer: API-created agents and schedule changes are persisted to account-scoped `agents.json`; full import/diff/rollback remains pending.
 - [Done] Manual schedule trigger: queue an existing schedule from the UI with a `Run now` action.
 - [Partial] Manual run form: trigger an agent immediately from the Agents list. Optional input overrides remain pending.
 - [Done] Run detail page: show logs, status transitions, selected inputs, model metadata, and generated artifacts.
 - [Done] Artifact browser: list S3 reports, preview markdown, and download artifacts through authenticated API routes.
 - [Done] Schedule editor: create, edit, pause, resume, delete, and manually trigger schedules from the UI.
 - [Done] Report links: show the generated `s3://...` key and optionally a short-lived presigned download URL.
+- [Done] List filtering: compact filters for agents, schedules, and runs by text/status without turning the UI into separate pages.
+- [Done] Detail panel consistency: keep one active detail panel at a time and keep list cards compact; new management actions should live in detail panels unless they are safe single-click actions.
 
 ## Agent And Model Runtime
 
@@ -26,6 +30,7 @@ This is the living list of features and platform work we want to consider after 
 - Prompt versioning: keep previous prompt/config versions and link each run to the exact version used.
 - Multi-artifact output: allow agents to emit markdown, JSON, images, CSV, or arbitrary files.
 - Structured output mode: let agents produce validated JSON plus optional human-readable reports.
+- Config validation preview: validate prompt-agent JSON and schedule targets before saving to S3 config.
 
 ## Execution And Reliability
 
@@ -46,6 +51,7 @@ This is the living list of features and platform work we want to consider after 
 - Avoid browser `localStorage` for long-lived admin credentials once the UI handles sensitive operations.
 - Secret management UI/docs: document how to set OpenAI/Anthropic/Gemini/Bedrock credentials safely.
 - Audit log: record API actor, action, target, timestamp, and request metadata.
+- Operational action confirmations: require clear confirmations for destructive actions such as deleting agents, deleting schedules, or replaying DLQ messages.
 - Cost dashboard: estimate fixed monthly costs and recent variable costs from CloudWatch/AWS billing signals.
 - Alarms: notify on failed runs, DLQ depth, worker crash loops, high API 5xx rate, and RDS/storage thresholds.
 - Backups and restore drill: document and periodically test RDS and S3 artifact restore.
@@ -55,7 +61,7 @@ This is the living list of features and platform work we want to consider after 
 - Separate `dev` and `prod` stacks with explicit naming and deployment commands.
 - GitHub Actions CI for typecheck/tests/synth and optional manual deploy.
 - CDK context/config for environment-specific sizing, schedules, and feature flags.
-- [Partial] Schedule reconciliation: API-created agent schedules are created in EventBridge Scheduler. Full S3/database-to-EventBridge diffing remains pending.
+- [Partial] Schedule reconciliation: API-created agent schedules are created, updated, paused/resumed, and deleted in EventBridge Scheduler. Full S3/database-to-EventBridge diffing remains pending.
 - API Gateway alternative evaluation for lower fixed cost than ALB.
 - ECS service autoscaling based on SQS queue depth.
 - Per-run ECS tasks for stronger isolation when agents need heavier tools or risky operations.

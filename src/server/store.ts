@@ -36,6 +36,8 @@ export interface Store {
   listAgents(): Promise<AgentDefinition[]>;
   getAgent(id: string): Promise<AgentDefinition | undefined>;
   upsertAgent(input: AgentDefinition): Promise<AgentDefinition>;
+  updateAgent(id: string, input: AgentDefinition): Promise<AgentDefinition | undefined>;
+  deleteAgent(id: string): Promise<boolean>;
   createArtifact(input: Omit<RunArtifact, "id" | "createdAt">): Promise<RunArtifact>;
   getArtifact(id: string): Promise<RunArtifact | undefined>;
   listRunArtifacts(runId: string): Promise<RunArtifact[]>;
@@ -197,6 +199,21 @@ export class MemoryStore implements Store {
     const agent = existing ? { ...input, createdAt: existing.createdAt, updatedAt: now() } : input;
     this.agents.set(agent.id, agent);
     return agent;
+  }
+
+  async updateAgent(idValue: string, input: AgentDefinition): Promise<AgentDefinition | undefined> {
+    const existing = this.agents.get(idValue);
+    if (!existing) return undefined;
+    const agent = { ...input, id: existing.id, slug: existing.slug, createdAt: existing.createdAt, updatedAt: now() };
+    this.agents.set(agent.id, agent);
+    return agent;
+  }
+
+  async deleteAgent(idValue: string): Promise<boolean> {
+    const existing = this.agents.get(idValue);
+    if (!existing) return false;
+    this.agents.set(idValue, { ...existing, enabled: false, updatedAt: now() });
+    return true;
   }
 
   async createArtifact(input: Omit<RunArtifact, "id" | "createdAt">): Promise<RunArtifact> {

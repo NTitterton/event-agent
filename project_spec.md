@@ -10,7 +10,7 @@ Unlike OpenClaw/Hermes-like continuously running personal assistants, Event Agen
 
 - No required local Docker Postgres or laptop-hosted durable runtime.
 - No full multi-user account system; v1 uses a single bearer token.
-- No full schedule reconciliation loop yet; v1 can create new EventBridge schedules through the API, but it does not continuously diff every S3 config schedule against AWS.
+- No full schedule reconciliation loop yet; v1 can create, update, pause/resume, and delete API-created EventBridge schedules, but it does not continuously diff every S3 config schedule against AWS.
 - No Kubernetes requirement in v1; EKS remains a future worker backend.
 - No provider-specific webhook verification in the first engine milestone unless it is needed for an early workflow.
 - No guarantee of exactly-once execution; v1 targets at-least-once execution with idempotency keys.
@@ -62,6 +62,8 @@ Schedules should support:
 
 The first implementation may store and trigger schedules through an in-memory adapter for smoke tests, but the production design is RDS plus EventBridge Scheduler.
 
+Implemented schedule management includes create, edit, pause/resume, delete, and manual trigger from the UI/API. Editing a schedule updates Postgres, account-scoped S3 config, and the matching EventBridge Scheduler resource when the schedule was created through the API.
+
 ### Agent Config
 
 Prompt agents are configuration, not per-agent TypeScript files. The initial config source is a versioned S3 JSON document:
@@ -89,6 +91,8 @@ Each agent config includes:
 - `updatedAt`
 
 For v1, the deployed stack writes runtime-created agents to `accounts/default/agents.json`. The runtime also supports looking up a token-derived account key before falling back to `default`, so future scoped API tokens can map to separate S3 config objects. CDK deploys the starter document under `seed/accounts/default/agents.json` so future deployments do not overwrite the account's runtime-edited config.
+
+Implemented agent management includes listing, creation, detail inspection, prompt/config/output viewing, associated schedules, recent runs, and manual triggering. Agent update/delete is a near-term requirement, but not part of the current implemented API surface yet.
 
 ### Runs
 
@@ -138,11 +142,15 @@ The first UI should show:
 - Agent list.
 - Agent creation form for data-driven prompt agents.
 - Schedule creation form for agent cron schedules.
+- Agent detail panel.
+- Schedule detail panel with edit, pause/resume, run-now, and delete actions.
 - Run list.
 - Run detail and logs.
 - Manual trigger action.
 - Retry and cancel actions.
 - Worker health summary when available.
+
+Operational UI pattern: the three top swim lanes should remain scannable lists. Rows should expose compact primary actions such as `Details` or `Run now`; destructive or multi-step management actions should live in the selected detail panel. Only one detail panel should be visible at a time. Status colors should be consistent across list rows: green for enabled/succeeded, yellow for paused/disabled or waiting states, blue for running, and red for failed/deleted/destructive states.
 
 ### API
 
@@ -153,6 +161,8 @@ Initial API:
 - `GET /api/agents`
 - `GET /api/agents/:id`
 - `POST /api/agents`
+- Future: `PATCH /api/agents/:id`
+- Future: `DELETE /api/agents/:id`
 - `POST /api/agents/:id/trigger`
 - `GET /api/schedules`
 - `POST /api/schedules`
@@ -171,6 +181,7 @@ All non-health API routes require `Authorization: Bearer <EVENT_AGENT_AUTH_TOKEN
 - Repo contains durable documentation, setup instructions, and verification scripts.
 - `npm run check` type-checks the TypeScript code.
 - `npm run smoke` verifies health, auth, schedule creation, manual triggering, and run listing without touching AWS.
+- Schedule create/edit/pause/resume/delete flows update durable state and account-scoped config, and reconcile API-created EventBridge Scheduler resources in hosted mode.
 - The default prompt agent and its stock universe are loaded from `config/accounts/default/agents.json`, not from stock-specific TypeScript modules.
 - The docs clearly state that cloud runtime is required for durable operation.
 - The architecture cleanly separates control-plane APIs, trigger adapters, queue adapters, worker execution, and persistence.

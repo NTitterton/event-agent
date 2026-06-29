@@ -13,7 +13,7 @@ This repo is an initial scaffold. It includes:
 - A TypeScript worker skeleton.
 - Shared event, schedule, run, and worker types.
 - S3/local JSON configuration for data-driven prompt agents.
-- A minimal browser UI shell.
+- A browser operations UI for agents, schedules, runs, logs, and artifacts.
 - Verification scripts that run without provisioning AWS resources.
 - Infrastructure notes for the AWS-first deployment path.
 
@@ -53,7 +53,7 @@ npm run test
 npm run smoke
 ```
 
-`npm run smoke` starts the API on a temporary port, checks health, verifies bearer-token enforcement, seeds the example prompt agent, creates an in-memory schedule, triggers a run, and confirms run listing works.
+`npm run smoke` starts the API on a temporary port, checks health, verifies bearer-token enforcement, seeds the example prompt agent, creates an in-memory schedule, pauses/resumes/deletes that schedule, triggers a run, and confirms run listing works.
 
 ## Configuration
 
@@ -99,6 +99,8 @@ The intended flow is:
 5. Failed jobs retry according to policy and eventually move to dead-letter state.
 
 Agents are data, not per-agent TypeScript modules. The daily stock example lives in `config/accounts/default/agents.json`, which the CDK stack deploys into the private config bucket under `seed/accounts/default/agents.json`. Runtime-created agents are written to account config such as `accounts/default/agents.json` through the API/UI. The document contains prompt text, input resolver config, model provider/model, schedules, and S3 output settings. TypeScript code supplies reusable execution primitives such as SQS polling, input resolution, model-provider adapters, and artifact writing.
+
+The current UI keeps list cards compact and puts operational actions in detail panels. Agent rows expose details and manual run actions. Schedule rows expose a detail panel where operators can edit, pause/resume, run now, or delete. Only one detail panel is shown at a time so agent, schedule, and run inspection do not stack into a long page.
 
 See [project_spec.md](project_spec.md) and [project_design.md](project_design.md) for the living product and architecture docs.
 

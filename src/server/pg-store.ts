@@ -363,6 +363,59 @@ export class PgStore implements Store {
     return agentFromRow(result.rows[0]);
   }
 
+  async updateAgent(id: string, input: AgentDefinition): Promise<AgentDefinition | undefined> {
+    await this.init();
+    const current = await this.pool.query("select * from agents where id = $1", [id]);
+    if (!current.rowCount) return undefined;
+    const existing = agentFromRow(current.rows[0]);
+    const updated: AgentDefinition = {
+      ...input,
+      id: existing.id,
+      slug: existing.slug,
+      createdAt: existing.createdAt,
+      updatedAt: new Date().toISOString()
+    };
+    await this.pool.query(
+      `update agents set
+        name = $2,
+        description = $3,
+        enabled = $4,
+        kind = $5,
+        model_provider = $6,
+        model = $7,
+        system_prompt = $8,
+        user_prompt_template = $9,
+        config = $10,
+        output = $11,
+        updated_at = $12
+       where id = $1`,
+      [
+        id,
+        updated.name,
+        updated.description,
+        updated.enabled,
+        updated.kind,
+        updated.modelProvider,
+        updated.model,
+        updated.systemPrompt,
+        updated.userPromptTemplate,
+        JSON.stringify(updated.config),
+        JSON.stringify(updated.output),
+        updated.updatedAt
+      ]
+    );
+    return updated;
+  }
+
+  async deleteAgent(id: string): Promise<boolean> {
+    await this.init();
+    const result = await this.pool.query("update agents set enabled = false, updated_at = $2 where id = $1", [
+      id,
+      new Date().toISOString()
+    ]);
+    return Boolean(result.rowCount);
+  }
+
   async createArtifact(input: Omit<RunArtifact, "id" | "createdAt">): Promise<RunArtifact> {
     await this.init();
     const artifact: RunArtifact = { ...input, id: id("art"), createdAt: new Date().toISOString() };

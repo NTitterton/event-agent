@@ -41,6 +41,7 @@ const agentInputSchema = z.object({
   userPromptTemplate: z.string().min(1),
   outputPrefix: z.string().min(1).optional()
 });
+const agentPatchInputSchema = agentInputSchema.partial();
 
 export interface AppDependencies {
   config?: AppConfig;
@@ -124,9 +125,31 @@ export async function buildApp(deps: AppDependencies = {}): Promise<FastifyInsta
     return reply.code(201).send({ agent });
   });
 
+  app.patch<{ Params: { id: string } }>("/api/agents/:id", async (request, reply) => {
+    const parsed = agentPatchInputSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid agent", details: parsed.error.flatten() });
+    const existing = await store.getAgent(request.params.id);
+    if (!existing) return reply.code(404).send({ error: "Agent not found" });
+    const agent = buildUpdatedPromptAgent(existing, parsed.data);
+    const updated = await store.updateAgent(existing.id, agent);
+    if (!updated) return reply.code(404).send({ error: "Agent not found" });
+    await upsertAgentInConfig(config, updated);
+    return { agent: updated };
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/agents/:id", async (request, reply) => {
+    const existing = await store.getAgent(request.params.id);
+    if (!existing) return reply.code(404).send({ error: "Agent not found" });
+    const deleted = await store.deleteAgent(existing.id);
+    if (!deleted) return reply.code(404).send({ error: "Agent not found" });
+    await removeAgentFromConfig(config, existing.id);
+    return reply.code(204).send();
+  });
+
   app.post<{ Params: { id: string } }>("/api/agents/:id/trigger", async (request, reply) => {
     const agent = await store.getAgent(request.params.id);
     if (!agent) return reply.code(404).send({ error: "Agent not found" });
+    if (!agent.enabled) return reply.code(409).send({ error: "Agent is disabled" });
     const firedAt = new Date().toISOString();
     const message: AgentTriggerMessage = {
       kind: "agent.trigger",
@@ -275,6 +298,41 @@ function buildPromptAgent(
   };
 }
 
+function buildUpdatedPromptAgent(
+  existing: AgentDefinition,
+  input: z.infer<typeof agentPatchInputSchema>
+): AgentDefinition {
+  const name = input.name ?? existing.name;
+  return {
+    ...existing,
+    name,
+    description: input.description ?? existing.description,
+    enabled: input.enabled ?? existing.enabled,
+    modelProvider: input.modelProvider ?? existing.modelProvider,
+    model: input.model ?? existing.model,
+    systemPrompt: input.systemPrompt ?? existing.systemPrompt,
+    userPromptTemplate: input.userPromptTemplate ?? existing.userPromptTemplate,
+    config: updateReportTitleTemplate(existing.config, name),
+    output: {
+      ...existing.output,
+      ...(input.outputPrefix ? { prefix: input.outputPrefix } : {})
+    },
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function updateReportTitleTemplate(config: Record<string, unknown>, name: string): Record<string, unknown> {
+  const report = config.report;
+  if (!report || typeof report !== "object" || Array.isArray(report)) return config;
+  return {
+    ...config,
+    report: {
+      ...report,
+      titleTemplate: `{{date}} ${name}`
+    }
+  };
+}
+
 function slugify(value: string): string {
   return (
     value
@@ -327,6 +385,28 @@ function scheduleConfigFor(schedule: Schedule) {
     enabled: schedule.enabled,
     queue: schedule.queue,
     event: schedule.event
+  };
+}
+
+async function upsertAgentInConfig(config: AppConfig, agent: AgentDefinition): Promise<void> {
+  const document = await loadAgentConfigDocument(config);
+  const index = document.agents.findIndex((existing) => existing.id === agent.id);
+  const configAgent = agentConfigFor(agent);
+  if (index === -1) document.agents.push(configAgent);
+  if (index !== -1) document.agents[index] = configAgent;
+  await saveAgentConfigDocument(config, document);
+}
+
+async function removeAgentFromConfig(config: AppConfig, agentId: string): Promise<void> {
+  const document = await loadAgentConfigDocument(config);
+  document.agents = document.agents.filter((agent) => agent.id !== agentId);
+  await saveAgentConfigDocument(config, document);
+}
+
+function agentConfigFor(agent: AgentDefinition): AgentDefinition {
+  return {
+    ...agent,
+    output: { ...agent.output, bucket: "{{reportsBucket}}" }
   };
 }
 

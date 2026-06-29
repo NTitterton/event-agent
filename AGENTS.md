@@ -21,6 +21,14 @@ Event Agent is a cloud-hosted, event-driven agent platform. It should run schedu
 - Keep README commands and environment variable lists current.
 - If a user gives product requirements in chat, capture them in the relevant project doc before they fade into conversation history.
 
+## Product UI Pattern
+
+- Keep the operations UI dense and work-focused.
+- Keep agent, schedule, and run lists as compact swim lanes.
+- Put multi-step or destructive actions in the selected detail panel.
+- Show only one detail panel at a time unless the user explicitly asks for side-by-side inspection.
+- Use consistent status colors across lanes: green for enabled/succeeded, yellow for paused/disabled or waiting states, blue for running, and red for failed/destructive states.
+
 ## Git And GitHub
 
 - Commit after meaningful, coherent checkpoints.
@@ -50,4 +58,3 @@ Event Agent is a cloud-hosted, event-driven agent platform. It should run schedu
 - Default queue layer: SQS with dead-letter queues.
 - Default worker pool: ECS/Fargate.
 - EKS/Kubernetes is a future worker backend after the job contract and Fargate deployment are stable.
-
