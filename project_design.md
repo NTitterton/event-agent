@@ -16,8 +16,8 @@ flowchart TB
 
     subgraph Runtime["Compute"]
         direction LR
-        API["API Service<br/>Fastify + static UI"]
-        Worker["Worker Service<br/>SQS consumer"]
+        API["ECS/Fargate API Service<br/>desired count: 1 task<br/>Fastify + static UI<br/>registered as ALB target"]
+        Worker["ECS/Fargate Worker Service<br/>desired count: 1+ tasks<br/>SQS long-poll consumer<br/>horizontally scalable"]
         Executor["Prompt Agent Executor<br/>resolvers + prompt render"]
     end
 
@@ -43,7 +43,7 @@ flowchart TB
 
     Browser --> ALB
     Client --> ALB
-    ALB --> API
+    ALB -->|"routes HTTP traffic to healthy targets"| API
 
     API -->|"agent/schedule CRUD<br/>run detail + logs"| DB
     API -->|"persist agent/schedule config"| Config
@@ -53,7 +53,7 @@ flowchart TB
     API -->|"read API token + DB password"| Secrets
 
     Scheduler -->|"scheduled agent.trigger"| Queue
-    Queue --> Worker
+    Queue -->|"workers poll messages"| Worker
     Queue -. "redrive on failure" .-> DLQ
 
     Worker -->|"lease/update runs<br/>write logs + artifact metadata"| DB
