@@ -5,78 +5,66 @@ Event Agent is a cloud-hosted event and worker system for agent jobs. It is desi
 ## 1. System Design Diagram
 
 ```mermaid
-graph TD
-    Browser["Browser Operations UI"]
-    ExternalClient["External API Client"]
-
-    subgraph "AWS Edge And Runtime"
-        ALB["Application Load Balancer<br/>HTTP dev endpoint"]
-        ApiSvc["ECS/Fargate API Service<br/>Fastify + static UI"]
-        WorkerSvc["ECS/Fargate Worker Service<br/>SQS consumer"]
+flowchart TB
+    subgraph Entry["Entry Points"]
+        direction LR
+        Browser["Browser<br/>Operations UI"]
+        Client["External API Client"]
     end
 
-    subgraph "Control Plane API"
-        Auth["Bearer Token Auth<br/>all /api except health"]
-        AgentApi["Agent API<br/>create, detail, update, soft-delete, trigger"]
-        ScheduleApi["Schedule API<br/>create, edit, pause, resume, delete, trigger"]
-        RunApi["Run/Artifact API<br/>list, detail, logs, presigned URLs"]
-        ConfigWriter["Config Writer<br/>accounts/default/agents.json"]
-        SchedulerReconciler["EventBridge Scheduler Reconciler<br/>API-created schedules"]
-        Dispatcher["Dispatcher<br/>events + runs + queue messages"]
+    ALB["Application Load Balancer<br/>HTTP dev endpoint"]
+
+    subgraph Runtime["Compute"]
+        direction LR
+        API["API Service<br/>Fastify + static UI"]
+        Worker["Worker Service<br/>SQS consumer"]
+        Executor["Prompt Agent Executor<br/>resolvers + prompt render"]
     end
 
-    subgraph "Persistent State"
-        ConfigS3["S3 Config Bucket<br/>accounts/default/agents.json<br/>seed/accounts/default/agents.json"]
-        DB[("RDS PostgreSQL<br/>agents, schedules, events,<br/>runs, run_logs, run_artifacts")]
-        ReportS3["S3 Reports Bucket<br/>markdown artifacts"]
-        Secrets["Secrets Manager<br/>API token, DB password, OpenAI key"]
+    subgraph Async["Async Execution"]
+        direction TB
+        Scheduler["EventBridge Scheduler<br/>cron/rate schedule group"]
+        Queue[("SQS Default Queue<br/>run + agent.trigger messages")]
+        DLQ[("SQS Dead-Letter Queue")]
     end
 
-    subgraph "Execution Plane"
-        EventBridge["EventBridge Scheduler<br/>cron/rate rules in schedule group"]
-        SQS["SQS Default Queue<br/>run + agent.trigger messages"]
-        DLQ["SQS Dead-Letter Queue"]
-        Executor["Prompt Agent Executor<br/>input resolvers + prompt render"]
-        Provider["Model Provider Adapter<br/>OpenAI today; others planned"]
-        CloudWatch["CloudWatch Logs<br/>api + worker containers"]
+    subgraph External["External Services"]
+        Provider["Model Provider<br/>OpenAI today; Anthropic/Gemini/Bedrock planned"]
+        Logs[("CloudWatch Logs<br/>api + worker containers")]
+    end
+
+    subgraph State["Durable State"]
+        direction LR
+        Config[("S3 Config Bucket<br/>accounts/default/agents.json<br/>seed/accounts/default/agents.json")]
+        DB[("RDS PostgreSQL<br/>agents, schedules, events<br/>runs, run_logs, run_artifacts")]
+        Reports[("S3 Reports Bucket<br/>markdown artifacts")]
+        Secrets[("Secrets Manager<br/>API token, DB password, OpenAI key")]
     end
 
     Browser --> ALB
-    ExternalClient --> ALB
-    ALB --> ApiSvc
-    ApiSvc --> Auth
-    Auth --> AgentApi
-    Auth --> ScheduleApi
-    Auth --> RunApi
+    Client --> ALB
+    ALB --> API
 
-    AgentApi --> DB
-    AgentApi --> ConfigWriter
-    AgentApi --> Dispatcher
-    ScheduleApi --> DB
-    ScheduleApi --> ConfigWriter
-    ScheduleApi --> SchedulerReconciler
-    ScheduleApi --> Dispatcher
-    RunApi --> DB
-    RunApi --> ReportS3
+    API -->|"agent/schedule CRUD<br/>run detail + logs"| DB
+    API -->|"persist agent/schedule config"| Config
+    API -->|"create/edit/pause/delete schedules"| Scheduler
+    API -->|"manual trigger messages"| Queue
+    API -->|"presigned artifact links"| Reports
+    API -->|"read API token + DB password"| Secrets
 
-    ConfigWriter --> ConfigS3
-    SchedulerReconciler --> EventBridge
-    Dispatcher --> DB
-    Dispatcher --> SQS
+    Scheduler -->|"scheduled agent.trigger"| Queue
+    Queue --> Worker
+    Queue -. "redrive on failure" .-> DLQ
 
-    EventBridge --> SQS
-    SQS --> WorkerSvc
-    SQS --> DLQ
-    WorkerSvc --> Executor
-    WorkerSvc --> DB
-    WorkerSvc --> ConfigS3
-    WorkerSvc --> Secrets
-    ApiSvc --> Secrets
-    Executor --> Provider
-    Executor --> ReportS3
-    Executor --> DB
-    ApiSvc --> CloudWatch
-    WorkerSvc --> CloudWatch
+    Worker -->|"lease/update runs<br/>write logs + artifact metadata"| DB
+    Worker -->|"load account config fallback"| Config
+    Worker -->|"read DB/OpenAI secrets"| Secrets
+    Worker --> Executor
+    Executor -->|"model request"| Provider
+    Executor -->|"write artifact bytes"| Reports
+
+    API --> Logs
+    Worker --> Logs
 ```
 
 ## 2. High-Level Design
